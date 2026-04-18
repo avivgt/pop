@@ -19,11 +19,11 @@ spec:
     spec:
       containers:
         - name: pop-console-plugin
-          image: image-registry.openshift-image-registry.svc:5000/pop-system/pop-console-plugin:v0.1.0
+          image: image-registry.openshift-image-registry.svc:5000/pop-system/pop-console-plugin:v0.1.2
           ports:
             - containerPort: 9443
               protocol: TCP
-              name: http
+              name: https
           resources:
             requests:
               cpu: 10m
@@ -31,15 +31,25 @@ spec:
             limits:
               cpu: 100m
               memory: 128Mi
+          volumeMounts:
+            - name: serving-cert
+              mountPath: /var/serving-cert
+              readOnly: true
           livenessProbe:
             httpGet:
               path: /health
               port: 9443
+              scheme: HTTPS
             initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /health
               port: 9443
+              scheme: HTTPS
             initialDelaySeconds: 5
             periodSeconds: 10
+      volumes:
+        - name: serving-cert
+          secret:
+            secretName: pop-console-plugin-cert
