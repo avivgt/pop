@@ -7,7 +7,13 @@ metadata:
   name: daily-backup
   namespace: pop-system
 spec:
-  schedule: "0 2 * * *"            # daily at 2 AM
+  frequency: Daily                    # Now | Every4Hours | Every8Hours | Every12Hours | Daily | Weekly | Monthly | Custom
+  time: "02:00"                       # HH:MM UTC (used with Daily, Weekly, Monthly)
+  # dayOfWeek: Monday                 # for Weekly frequency
+  # dayOfMonth: 1                     # for Monthly frequency (1-28)
+  # customInterval:                   # for Custom frequency
+  #   every: 6
+  #   unit: Hours                     # Minutes | Hours | Days
   pvcName: etcd-backup-storage
   retentionCount: 10
   retentionDays: 30

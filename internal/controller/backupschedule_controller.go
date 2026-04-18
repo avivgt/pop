@@ -113,10 +113,45 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	// 5. Parse the cron schedule.
-	cronSchedule, err := cron.ParseStandard(schedule.Spec.Schedule)
+	// 5. Resolve and parse the schedule.
+	cronExpr, humanDesc := resolveSchedule(schedule)
+	schedule.Status.ResolvedSchedule = cronExpr
+	schedule.Status.HumanReadableSchedule = humanDesc
+
+	if schedule.Spec.Frequency == popv1alpha1.BackupFrequencyNow && schedule.Status.LastBackupTime == nil {
+		timestamp := now.Format("20060102-150405")
+		backupName := fmt.Sprintf("%s-%s", schedule.Name, timestamp)
+		etcdBackup := &popv1alpha1.EtcdBackup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      backupName,
+				Namespace: schedule.Namespace,
+				Labels:    map[string]string{"pop.openshift.io/schedule": schedule.Name},
+			},
+			Spec: popv1alpha1.EtcdBackupSpec{
+				PVCName:              schedule.Spec.PVCName,
+				BackupTimeoutMinutes: schedule.Spec.BackupTimeoutMinutes,
+				ExportTarget:         schedule.Spec.ExportTarget,
+			},
+		}
+		if err := ctrl.SetControllerReference(schedule, etcdBackup, r.Scheme); err != nil {
+			return ctrl.Result{}, err
+		}
+		if err := r.Create(ctx, etcdBackup); err != nil && !apierrors.IsAlreadyExists(err) {
+			return ctrl.Result{}, err
+		}
+		logger.Info("triggered immediate backup", "backup", backupName)
+		schedule.Status.ActiveBackup = backupName
+		nowTime := metav1.NewTime(now)
+		schedule.Status.LastBackupTime = &nowTime
+		if err := r.Status().Update(ctx, schedule); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	cronSchedule, err := cron.ParseStandard(cronExpr)
 	if err != nil {
-		logger.Error(err, "failed to parse cron schedule", "schedule", schedule.Spec.Schedule)
+		logger.Error(err, "failed to parse resolved schedule", "schedule", cronExpr)
 		if updateErr := r.Status().Update(ctx, schedule); updateErr != nil {
 			return ctrl.Result{}, updateErr
 		}
@@ -197,7 +232,11 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 }
 
 func (r *BackupScheduleReconciler) computeAndSetNextBackupTime(schedule *popv1alpha1.BackupSchedule, now time.Time) error {
-	cronSchedule, err := cron.ParseStandard(schedule.Spec.Schedule)
+	cronExpr, humanDesc := resolveSchedule(schedule)
+	schedule.Status.ResolvedSchedule = cronExpr
+	schedule.Status.HumanReadableSchedule = humanDesc
+
+	cronSchedule, err := cron.ParseStandard(cronExpr)
 	if err != nil {
 		return err
 	}
@@ -208,7 +247,6 @@ func (r *BackupScheduleReconciler) computeAndSetNextBackupTime(schedule *popv1al
 	}
 
 	nextBackupTime := cronSchedule.Next(referenceTime)
-	// If computed next time is in the past (because we were suspended), advance to next from now.
 	if nextBackupTime.Before(now) {
 		nextBackupTime = cronSchedule.Next(now)
 	}
@@ -216,6 +254,65 @@ func (r *BackupScheduleReconciler) computeAndSetNextBackupTime(schedule *popv1al
 	nextTime := metav1.NewTime(nextBackupTime)
 	schedule.Status.NextBackupTime = &nextTime
 	return nil
+}
+
+var dayToCron = map[string]string{
+	"Sunday": "0", "Monday": "1", "Tuesday": "2", "Wednesday": "3",
+	"Thursday": "4", "Friday": "5", "Saturday": "6",
+}
+
+func resolveSchedule(schedule *popv1alpha1.BackupSchedule) (cronExpr string, humanReadable string) {
+	if schedule.Spec.Schedule != "" {
+		return schedule.Spec.Schedule, fmt.Sprintf("Custom cron: %s", schedule.Spec.Schedule)
+	}
+
+	t := schedule.Spec.Time
+	if t == "" {
+		t = "02:00"
+	}
+	hour := t[:2]
+	minute := t[3:5]
+
+	switch schedule.Spec.Frequency {
+	case popv1alpha1.BackupFrequencyNow:
+		return fmt.Sprintf("%s %s * * *", minute, hour), "Immediate (one-time)"
+	case popv1alpha1.BackupFrequencyEvery4Hours:
+		return "0 */4 * * *", "Every 4 hours"
+	case popv1alpha1.BackupFrequencyEvery8Hours:
+		return "0 */8 * * *", "Every 8 hours"
+	case popv1alpha1.BackupFrequencyEvery12Hours:
+		return "0 */12 * * *", "Every 12 hours"
+	case popv1alpha1.BackupFrequencyDaily:
+		return fmt.Sprintf("%s %s * * *", minute, hour), fmt.Sprintf("Daily at %s UTC", t)
+	case popv1alpha1.BackupFrequencyWeekly:
+		day := schedule.Spec.DayOfWeek
+		if day == "" {
+			day = "Sunday"
+		}
+		cronDay := dayToCron[day]
+		return fmt.Sprintf("%s %s * * %s", minute, hour, cronDay), fmt.Sprintf("Weekly on %s at %s UTC", day, t)
+	case popv1alpha1.BackupFrequencyMonthly:
+		dom := int32(1)
+		if schedule.Spec.DayOfMonth != nil {
+			dom = *schedule.Spec.DayOfMonth
+		}
+		return fmt.Sprintf("%s %s %d * *", minute, hour, dom), fmt.Sprintf("Monthly on day %d at %s UTC", dom, t)
+	case popv1alpha1.BackupFrequencyCustom:
+		if schedule.Spec.CustomInterval != nil {
+			ci := schedule.Spec.CustomInterval
+			switch ci.Unit {
+			case "Minutes":
+				return fmt.Sprintf("*/%d * * * *", ci.Every), fmt.Sprintf("Every %d minutes", ci.Every)
+			case "Hours":
+				return fmt.Sprintf("0 */%d * * *", ci.Every), fmt.Sprintf("Every %d hours", ci.Every)
+			case "Days":
+				return fmt.Sprintf("%s %s */%d * *", minute, hour, ci.Every), fmt.Sprintf("Every %d days at %s UTC", ci.Every, t)
+			}
+		}
+		return "0 2 * * *", "Custom (invalid, defaulting to daily at 02:00)"
+	default:
+		return fmt.Sprintf("%s %s * * *", minute, hour), fmt.Sprintf("Daily at %s UTC", t)
+	}
 }
 
 func (r *BackupScheduleReconciler) enforceRetention(ctx context.Context, schedule *popv1alpha1.BackupSchedule, now time.Time) error {

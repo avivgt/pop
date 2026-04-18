@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: image-registry.openshift-image-registry.svc:5000/pop-system/pop-operator
-  newTag: v0.1.1
+  newTag: v0.1.2
