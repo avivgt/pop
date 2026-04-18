@@ -1,0 +1,15 @@
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+LABEL name="pop-operator" \
+      vendor="POP Project" \
+      version="0.1.0" \
+      summary="POP Operator - Platform Outage Provisioner" \
+      description="Automates OpenShift control plane backup and graceful cluster shutdown" \
+      io.k8s.display-name="POP Operator" \
+      io.openshift.tags="backup,shutdown,etcd,maintenance"
+
+WORKDIR /
+COPY bin/manager-linux-amd64 /manager
+USER 65532:65532
+
+ENTRYPOINT ["/manager"]

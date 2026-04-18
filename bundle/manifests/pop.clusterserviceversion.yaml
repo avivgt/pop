@@ -53,8 +53,33 @@ metadata:
           },
           "spec": {
             "certExpiryThresholdDays": 30,
+            "cordonNodes": true,
             "dryRun": true,
+            "notifyApplications": true,
+            "preShutdownHooks": [
+              {
+                "command": [
+                  "/bin/bash",
+                  "-c",
+                  "echo 'Flushing databases...'"
+                ],
+                "image": "registry.redhat.io/ubi9/ubi-minimal:latest",
+                "name": "flush-databases",
+                "timeoutSeconds": 300
+              },
+              {
+                "command": [
+                  "/bin/bash",
+                  "-c",
+                  "echo 'Removing from load balancer...'"
+                ],
+                "image": "registry.redhat.io/ubi9/ubi-minimal:latest",
+                "name": "deregister-from-lb",
+                "timeoutSeconds": 120
+              }
+            ],
             "pvcName": "etcd-backup-storage",
+            "reason": "Quarterly datacenter maintenance",
             "shutdownDelayMinutes": 1,
             "skipCertCheck": false
           }
@@ -74,11 +99,111 @@ metadata:
             "backupTimeoutMinutes": 15,
             "pvcName": "etcd-backup-storage"
           }
+        },
+        {
+          "apiVersion": "pop.openshift.io/v1alpha1",
+          "kind": "PowerEvent",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "pop"
+            },
+            "name": "test-event",
+            "namespace": "pop-system"
+          },
+          "spec": {
+            "eventType": "Test",
+            "message": "Manual test of power event system",
+            "source": "manual-test",
+            "triggeredBy": "manual"
+          }
+        },
+        {
+          "apiVersion": "pop.openshift.io/v1alpha1",
+          "kind": "PowerProtectionConfig",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "pop"
+            },
+            "name": "default",
+            "namespace": "pop-system"
+          },
+          "spec": {
+            "alertEndpoint": {
+              "authTokenSecret": "psu-alert-token",
+              "port": 8082
+            },
+            "autonomousShutdown": true,
+            "backupConfig": {
+              "pvcName": "etcd-backup-storage",
+              "shutdownDelayMinutes": 1
+            },
+            "batteryCapacityMinutes": 15,
+            "clusterPriority": "Standard",
+            "enabled": true,
+            "notification": {
+              "alertmanager": {
+                "enabled": true
+              },
+              "kubernetesEvents": {
+                "enabled": true
+              },
+              "smtp": {
+                "enabled": false
+              },
+              "webhook": {
+                "enabled": true,
+                "url": "https://hooks.slack.com/services/REPLACE_ME"
+              }
+            },
+            "powerConfirmationSeconds": 120
+          }
+        },
+        {
+          "apiVersion": "pop.openshift.io/v1alpha1",
+          "kind": "WorkloadEvacuation",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "pop"
+            },
+            "name": "pre-maint-evacuation",
+            "namespace": "pop-system"
+          },
+          "spec": {
+            "dryRun": true,
+            "namespaces": [
+              "app-frontend",
+              "app-backend",
+              "app-data"
+            ],
+            "reason": "Pre-maintenance workload migration",
+            "strategy": "Canary",
+            "targetClusters": [
+              "ocp-prod-west",
+              "ocp-prod-east"
+            ],
+            "waves": [
+              {
+                "percent": 10,
+                "verifyDurationSeconds": 300
+              },
+              {
+                "percent": 50,
+                "verifyDurationSeconds": 300
+              },
+              {
+                "percent": 100,
+                "verifyDurationSeconds": 60
+              }
+            ]
+          }
         }
       ]
     capabilities: Basic Install
     console.openshift.io/plugins: '["pop-console-plugin"]'
-    createdAt: "2026-04-18T07:24:03Z"
+    createdAt: "2026-04-18T10:20:11Z"
     operators.operatorframework.io/builder: operator-sdk-v1.39.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: pop.v0.1.0
@@ -113,6 +238,25 @@ spec:
       kind: EtcdBackup
       name: etcdbackups.pop.openshift.io
       version: v1alpha1
+    - description: PowerEvent represents a power-related event detected by the PSU
+        alert system.
+      displayName: Power Event
+      kind: PowerEvent
+      name: powerevents.pop.openshift.io
+      version: v1alpha1
+    - description: PowerProtectionConfig configures UPS/PSU-driven power protection
+        for the cluster.
+      displayName: Power Protection Config
+      kind: PowerProtectionConfig
+      name: powerprotectionconfigs.pop.openshift.io
+      version: v1alpha1
+    - description: |-
+        WorkloadEvacuation requests ACM to migrate workloads away from this cluster,
+        supporting canary/A-B testing style gradual migration.
+      displayName: Workload Evacuation
+      kind: WorkloadEvacuation
+      name: workloadevacuations.pop.openshift.io
+      version: v1alpha1
   description: |
     POP (Platform Outage Provisioner) automates OpenShift cluster lifecycle operations:
     - Etcd backup with PVC and S3 export
@@ -131,6 +275,14 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - configmaps
+          verbs:
+          - create
+          - get
+          - update
+        - apiGroups:
+          - ""
+          resources:
           - events
           verbs:
           - create
@@ -138,7 +290,7 @@ spec:
         - apiGroups:
           - ""
           resources:
-          - nodes
+          - namespaces
           - persistentvolumeclaims
           - secrets
           verbs:
@@ -148,10 +300,29 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - nodes
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
           - pods
           verbs:
           - create
           - delete
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - statefulsets
+          verbs:
           - get
           - list
           - watch
@@ -206,6 +377,9 @@ spec:
           - clusterrestarts
           - clustershutdowns
           - etcdbackups
+          - powerevents
+          - powerprotectionconfigs
+          - workloadevacuations
           verbs:
           - create
           - delete
@@ -221,6 +395,9 @@ spec:
           - clusterrestarts/finalizers
           - clustershutdowns/finalizers
           - etcdbackups/finalizers
+          - powerevents/finalizers
+          - powerprotectionconfigs/finalizers
+          - workloadevacuations/finalizers
           verbs:
           - update
         - apiGroups:
@@ -230,6 +407,9 @@ spec:
           - clusterrestarts/status
           - clustershutdowns/status
           - etcdbackups/status
+          - powerevents/status
+          - powerprotectionconfigs/status
+          - workloadevacuations/status
           verbs:
           - get
           - patch
@@ -273,7 +453,7 @@ spec:
                 - --health-probe-bind-address=:8081
                 command:
                 - /manager
-                image: quay.io/avivgt/pop-operator:v0.1.0
+                image: image-registry.openshift-image-registry.svc:5000/pop-system/pop-operator:v0.1.1
                 livenessProbe:
                   httpGet:
                     path: /healthz

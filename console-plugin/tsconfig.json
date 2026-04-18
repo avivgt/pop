@@ -11,8 +11,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "declaration": true,
+    "declaration": false,
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./src"

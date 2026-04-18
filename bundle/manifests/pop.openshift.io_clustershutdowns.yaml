@@ -66,15 +66,65 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
+              cordonNodes:
+                default: true
+                description: CordonNodes when true cordons all nodes before shutdown.
+                type: boolean
               dryRun:
                 default: false
                 description: |-
                   DryRun when true validates prerequisites and takes an etcd backup
                   but does NOT shut down nodes.
                 type: boolean
+              notifyApplications:
+                default: true
+                description: |-
+                  NotifyApplications when true creates a ConfigMap signal that
+                  applications can watch to prepare for shutdown.
+                type: boolean
+              preShutdownHooks:
+                description: |-
+                  PreShutdownHooks is a list of Jobs to run before shutdown.
+                  All hooks must complete successfully before proceeding.
+                items:
+                  properties:
+                    command:
+                      description: Command is the command to execute.
+                      items:
+                        type: string
+                      type: array
+                    image:
+                      description: Image is the container image to run.
+                      type: string
+                    name:
+                      description: Name is a human-readable identifier for this hook.
+                      type: string
+                    timeoutSeconds:
+                      default: 300
+                      description: TimeoutSeconds is the maximum time for this hook
+                        to complete.
+                      format: int32
+                      type: integer
+                  required:
+                  - command
+                  - image
+                  - name
+                  - timeoutSeconds
+                  type: object
+                type: array
               pvcName:
                 description: PVCName is the name of the PVC for the etcd backup.
                 minLength: 1
+                type: string
+              reason:
+                description: Reason documents why the shutdown is happening (audit
+                  trail).
+                type: string
+              scheduledTime:
+                description: |-
+                  ScheduledTime is a future time to begin the shutdown.
+                  If set, the controller waits until this time before proceeding.
+                format: date-time
                 type: string
               shutdownDelayMinutes:
                 default: 1
@@ -96,6 +146,11 @@ spec:
                   SkipPreflightChecks when true bypasses enhanced pre-flight checks
                   (degraded operators, in-progress updates).
                 type: boolean
+              workloadEvacuationRef:
+                description: |-
+                  WorkloadEvacuationRef optionally references a WorkloadEvacuation CR.
+                  If set, the controller waits for evacuation to complete before shutting down.
+                type: string
             required:
             - pvcName
             type: object
@@ -168,10 +223,41 @@ spec:
                   - type
                   type: object
                 type: array
+              cordonedNodes:
+                description: CordonedNodes is the count of nodes that have been cordoned.
+                format: int32
+                type: integer
+              estimatedCompletionTime:
+                description: EstimatedCompletionTime is the estimated time the shutdown
+                  will complete.
+                format: date-time
+                type: string
               etcdBackupRef:
                 description: EtcdBackupRef is the name of the EtcdBackup CR created
                   for this shutdown.
                 type: string
+              hookStatuses:
+                description: HookStatuses tracks pre-shutdown hook execution.
+                items:
+                  properties:
+                    jobName:
+                      description: JobName is the name of the Job created for this
+                        hook.
+                      type: string
+                    message:
+                      description: Message provides detail.
+                      type: string
+                    name:
+                      description: Name of the hook.
+                      type: string
+                    phase:
+                      description: Phase is Pending, Running, Completed, or Failed.
+                      type: string
+                  required:
+                  - name
+                  - phase
+                  type: object
+                type: array
               message:
                 description: Message provides detail about the current phase.
                 type: string
@@ -207,7 +293,11 @@ spec:
                 description: Phase is the current phase.
                 enum:
                 - Pending
+                - Scheduled
                 - Validating
+                - Cordoning
+                - RunningHooks
+                - NotifyingApps
                 - BackingUp
                 - ShuttingDown
                 - Complete

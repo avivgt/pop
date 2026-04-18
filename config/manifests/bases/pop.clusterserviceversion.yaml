@@ -37,6 +37,25 @@ spec:
       kind: EtcdBackup
       name: etcdbackups.pop.openshift.io
       version: v1alpha1
+    - description: PowerEvent represents a power-related event detected by the PSU
+        alert system.
+      displayName: Power Event
+      kind: PowerEvent
+      name: powerevents.pop.openshift.io
+      version: v1alpha1
+    - description: PowerProtectionConfig configures UPS/PSU-driven power protection
+        for the cluster.
+      displayName: Power Protection Config
+      kind: PowerProtectionConfig
+      name: powerprotectionconfigs.pop.openshift.io
+      version: v1alpha1
+    - description: |-
+        WorkloadEvacuation requests ACM to migrate workloads away from this cluster,
+        supporting canary/A-B testing style gradual migration.
+      displayName: Workload Evacuation
+      kind: WorkloadEvacuation
+      name: workloadevacuations.pop.openshift.io
+      version: v1alpha1
   description: |
     POP (Platform Outage Provisioner) automates OpenShift cluster lifecycle operations:
     - Etcd backup with PVC and S3 export
