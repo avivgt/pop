@@ -1,0 +1,13 @@
+apiVersion: pop.openshift.io/v1alpha1
+kind: PowerEvent
+metadata:
+  labels:
+    app.kubernetes.io/name: pop
+    app.kubernetes.io/managed-by: kustomize
+  name: test-event
+  namespace: pop-system
+spec:
+  eventType: Test
+  source: manual-test
+  triggeredBy: manual
+  message: "Manual test of power event system"

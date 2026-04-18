@@ -1,0 +1,28 @@
+apiVersion: pop.openshift.io/v1alpha1
+kind: ClusterShutdown
+metadata:
+  labels:
+    app.kubernetes.io/name: pop
+    app.kubernetes.io/managed-by: kustomize
+  name: planned-outage
+  namespace: pop-system
+spec:
+  pvcName: etcd-backup-storage
+  reason: "Quarterly datacenter maintenance"
+  dryRun: true                        # set to false for actual shutdown
+  # scheduledTime: "2026-05-01T02:00:00Z"  # optional: schedule for future
+  shutdownDelayMinutes: 1             # use 10 for clusters with 10+ nodes
+  skipCertCheck: false
+  certExpiryThresholdDays: 30
+  cordonNodes: true                   # cordon nodes before shutdown
+  notifyApplications: true            # create ConfigMap signal for apps
+  # workloadEvacuationRef: pre-maint-evacuation  # optional: wait for ACM evacuation
+  preShutdownHooks:
+    - name: flush-databases
+      image: registry.redhat.io/ubi9/ubi-minimal:latest
+      command: ["/bin/bash", "-c", "echo 'Flushing databases...'"]
+      timeoutSeconds: 300
+    - name: deregister-from-lb
+      image: registry.redhat.io/ubi9/ubi-minimal:latest
+      command: ["/bin/bash", "-c", "echo 'Removing from load balancer...'"]
+      timeoutSeconds: 120

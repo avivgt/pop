@@ -1,0 +1,15 @@
+apiVersion: pop.openshift.io/v1alpha1
+kind: BackupSchedule
+metadata:
+  labels:
+    app.kubernetes.io/name: pop
+    app.kubernetes.io/managed-by: kustomize
+  name: daily-backup
+  namespace: pop-system
+spec:
+  schedule: "0 2 * * *"            # daily at 2 AM
+  pvcName: etcd-backup-storage
+  retentionCount: 10
+  retentionDays: 30
+  suspend: false
+  backupTimeoutMinutes: 15

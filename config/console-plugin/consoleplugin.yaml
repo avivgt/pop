@@ -1,0 +1,13 @@
+apiVersion: console.openshift.io/v1
+kind: ConsolePlugin
+metadata:
+  name: pop-console-plugin
+spec:
+  displayName: "POP - Platform Outage Provisioner"
+  backend:
+    type: Service
+    service:
+      name: pop-console-plugin
+      namespace: pop-system
+      port: 9443
+      basePath: /

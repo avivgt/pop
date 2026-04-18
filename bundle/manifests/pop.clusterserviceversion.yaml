@@ -1,0 +1,363 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "pop.openshift.io/v1alpha1",
+          "kind": "BackupSchedule",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "pop"
+            },
+            "name": "daily-backup",
+            "namespace": "pop-system"
+          },
+          "spec": {
+            "backupTimeoutMinutes": 15,
+            "pvcName": "etcd-backup-storage",
+            "retentionCount": 10,
+            "retentionDays": 30,
+            "schedule": "0 2 * * *",
+            "suspend": false
+          }
+        },
+        {
+          "apiVersion": "pop.openshift.io/v1alpha1",
+          "kind": "ClusterRestart",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "pop"
+            },
+            "name": "post-outage-restart",
+            "namespace": "pop-system"
+          },
+          "spec": {
+            "autoApproveCSRs": true,
+            "waitTimeoutMinutes": 30
+          }
+        },
+        {
+          "apiVersion": "pop.openshift.io/v1alpha1",
+          "kind": "ClusterShutdown",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "pop"
+            },
+            "name": "planned-outage",
+            "namespace": "pop-system"
+          },
+          "spec": {
+            "certExpiryThresholdDays": 30,
+            "dryRun": true,
+            "pvcName": "etcd-backup-storage",
+            "shutdownDelayMinutes": 1,
+            "skipCertCheck": false
+          }
+        },
+        {
+          "apiVersion": "pop.openshift.io/v1alpha1",
+          "kind": "EtcdBackup",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "pop"
+            },
+            "name": "manual-backup",
+            "namespace": "pop-system"
+          },
+          "spec": {
+            "backupTimeoutMinutes": 15,
+            "pvcName": "etcd-backup-storage"
+          }
+        }
+      ]
+    capabilities: Basic Install
+    console.openshift.io/plugins: '["pop-console-plugin"]'
+    createdAt: "2026-04-18T07:24:03Z"
+    operators.operatorframework.io/builder: operator-sdk-v1.39.2
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
+  name: pop.v0.1.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: BackupSchedule creates EtcdBackup CRs on a cron schedule with retention.
+      displayName: Backup Schedule
+      kind: BackupSchedule
+      name: backupschedules.pop.openshift.io
+      version: v1alpha1
+    - description: |-
+        ClusterRestart orchestrates bringing an OpenShift cluster back up
+        after a graceful shutdown.
+      displayName: Cluster Restart
+      kind: ClusterRestart
+      name: clusterrestarts.pop.openshift.io
+      version: v1alpha1
+    - description: |-
+        ClusterShutdown orchestrates a full OpenShift graceful shutdown:
+        validate prerequisites, back up etcd, and shut down all nodes.
+      displayName: Cluster Shutdown
+      kind: ClusterShutdown
+      name: clustershutdowns.pop.openshift.io
+      version: v1alpha1
+    - description: |-
+        EtcdBackup triggers a one-shot etcd backup on a control plane node
+        and exports the artifacts to a PVC.
+      displayName: Etcd Backup
+      kind: EtcdBackup
+      name: etcdbackups.pop.openshift.io
+      version: v1alpha1
+  description: |
+    POP (Platform Outage Provisioner) automates OpenShift cluster lifecycle operations:
+    - Etcd backup with PVC and S3 export
+    - Scheduled backups with retention policies
+    - Graceful cluster shutdown following OpenShift documentation
+    - Cluster restart with automatic CSR approval and operator health verification
+    - OpenShift Console plugin for visual management
+  displayName: POP - Platform Outage Provisioner
+  icon:
+  - base64data: ""
+    mediatype: image/png
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        - apiGroups:
+          - ""
+          resources:
+          - nodes
+          - persistentvolumeclaims
+          - secrets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - certificates.k8s.io
+          resources:
+          - certificatesigningrequests
+          verbs:
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - certificates.k8s.io
+          resources:
+          - certificatesigningrequests/approval
+          verbs:
+          - update
+        - apiGroups:
+          - certificates.k8s.io
+          resourceNames:
+          - kubernetes.io/kube-apiserver-client-kubelet
+          - kubernetes.io/kubelet-serving
+          resources:
+          - signers
+          verbs:
+          - approve
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - clusteroperators
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - pop.openshift.io
+          resources:
+          - backupschedules
+          - clusterrestarts
+          - clustershutdowns
+          - etcdbackups
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - pop.openshift.io
+          resources:
+          - backupschedules/finalizers
+          - clusterrestarts/finalizers
+          - clustershutdowns/finalizers
+          - etcdbackups/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - pop.openshift.io
+          resources:
+          - backupschedules/status
+          - clusterrestarts/status
+          - clustershutdowns/status
+          - etcdbackups/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        serviceAccountName: pop-controller-manager
+      deployments:
+      - label:
+          app.kubernetes.io/managed-by: kustomize
+          app.kubernetes.io/name: pop
+          control-plane: controller-manager
+        name: pop-controller-manager
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              control-plane: controller-manager
+          strategy: {}
+          template:
+            metadata:
+              annotations:
+                kubectl.kubernetes.io/default-container: manager
+              labels:
+                control-plane: controller-manager
+            spec:
+              containers:
+              - args:
+                - --metrics-bind-address=:8443
+                - --leader-elect
+                - --health-probe-bind-address=:8081
+                command:
+                - /manager
+                image: quay.io/avivgt/pop-operator:v0.1.0
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                name: manager
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: 500m
+                    memory: 128Mi
+                  requests:
+                    cpu: 10m
+                    memory: 64Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+              securityContext:
+                runAsNonRoot: true
+              serviceAccountName: pop-controller-manager
+              terminationGracePeriodSeconds: 10
+      permissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        serviceAccountName: pop-controller-manager
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - backup
+  - shutdown
+  - restart
+  - etcd
+  - maintenance
+  - lifecycle
+  maintainers:
+  - email: avivgt@redhat.com
+    name: Aviv GT
+  maturity: alpha
+  provider:
+    name: POP Project
+  version: 0.1.0

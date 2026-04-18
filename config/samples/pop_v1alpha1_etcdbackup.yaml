@@ -1,0 +1,12 @@
+apiVersion: pop.openshift.io/v1alpha1
+kind: EtcdBackup
+metadata:
+  labels:
+    app.kubernetes.io/name: pop
+    app.kubernetes.io/managed-by: kustomize
+  name: manual-backup
+  namespace: pop-system
+spec:
+  pvcName: etcd-backup-storage
+  backupTimeoutMinutes: 15
+  # controlPlaneNode: master-0  # optional — auto-selected if omitted

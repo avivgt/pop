@@ -1,0 +1,30 @@
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: pop-backup-privileged
+allowPrivilegedContainer: true
+allowHostNetwork: true
+allowHostPID: true
+allowHostDirVolumePlugin: true
+allowHostPorts: false
+allowHostIPC: false
+allowedCapabilities: []
+defaultAddCapabilities: []
+requiredDropCapabilities: []
+volumes:
+  - hostPath
+  - persistentVolumeClaim
+  - projected
+  - secret
+  - downwardAPI
+  - emptyDir
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: RunAsAny
+fsGroup:
+  type: RunAsAny
+supplementalGroups:
+  type: RunAsAny
+users:
+  - system:serviceaccount:pop-system:pop-controller-manager

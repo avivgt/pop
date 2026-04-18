@@ -1,0 +1,26 @@
+apiVersion: pop.openshift.io/v1alpha1
+kind: WorkloadEvacuation
+metadata:
+  labels:
+    app.kubernetes.io/name: pop
+    app.kubernetes.io/managed-by: kustomize
+  name: pre-maint-evacuation
+  namespace: pop-system
+spec:
+  strategy: Canary                    # AllAtOnce or Canary (A/B testing)
+  dryRun: true                        # set to false for actual migration
+  reason: "Pre-maintenance workload migration"
+  targetClusters:
+    - ocp-prod-west
+    - ocp-prod-east
+  namespaces:                         # empty = all user namespaces
+    - app-frontend
+    - app-backend
+    - app-data
+  waves:
+    - percent: 10
+      verifyDurationSeconds: 300      # 5 min health verification
+    - percent: 50
+      verifyDurationSeconds: 300
+    - percent: 100
+      verifyDurationSeconds: 60

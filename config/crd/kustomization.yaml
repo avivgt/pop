@@ -1,0 +1,34 @@
+# This kustomization.yaml is not intended to be run by itself,
+# since it depends on service name and namespace that are out of this kustomize package.
+# It should be run by config/default
+resources:
+- bases/pop.openshift.io_etcdbackups.yaml
+- bases/pop.openshift.io_clustershutdowns.yaml
+- bases/pop.openshift.io_backupschedules.yaml
+- bases/pop.openshift.io_clusterrestarts.yaml
+- bases/pop.openshift.io_powerprotectionconfigs.yaml
+- bases/pop.openshift.io_powerevents.yaml
+- bases/pop.openshift.io_workloadevacuations.yaml
+# +kubebuilder:scaffold:crdkustomizeresource
+
+patches:
+# [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
+# patches here are for enabling the conversion webhook for each CRD
+# +kubebuilder:scaffold:crdkustomizewebhookpatch
+
+# [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
+# patches here are for enabling the CA injection for each CRD
+#- path: patches/cainjection_in_etcdbackups.yaml
+#- path: patches/cainjection_in_clustershutdowns.yaml
+#- path: patches/cainjection_in_backupschedules.yaml
+#- path: patches/cainjection_in_clusterrestarts.yaml
+#- path: patches/cainjection_in_powerprotectionconfigs.yaml
+#- path: patches/cainjection_in_powerevents.yaml
+#- path: patches/cainjection_in_workloadevacuations.yaml
+# +kubebuilder:scaffold:crdkustomizecainjectionpatch
+
+# [WEBHOOK] To enable webhook, uncomment the following section
+# the following config is for teaching kustomize how to do kustomization for CRDs.
+
+#configurations:
+#- kustomizeconfig.yaml

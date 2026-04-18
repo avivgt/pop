@@ -1,0 +1,12 @@
+apiVersion: pop.openshift.io/v1alpha1
+kind: ClusterRestart
+metadata:
+  labels:
+    app.kubernetes.io/name: pop
+    app.kubernetes.io/managed-by: kustomize
+  name: post-outage-restart
+  namespace: pop-system
+spec:
+  autoApproveCSRs: true
+  waitTimeoutMinutes: 30
+  # expectedNodes: 6              # optional — verify exact node count

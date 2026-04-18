@@ -1,0 +1,69 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    app.kubernetes.io/name: pop
+    app.kubernetes.io/managed-by: kustomize
+  name: pop-alerts
+  namespace: system
+spec:
+  groups:
+    - name: pop.backup
+      rules:
+        - alert: POPBackupFailed
+          expr: increase(pop_etcd_backup_total{result="failure"}[2h]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "etcd backup failed"
+            description: "An etcd backup has failed in the last 2 hours."
+
+        - alert: POPNoRecentBackup
+          expr: (time() - pop_etcd_backup_last_success_timestamp) > 86400
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "No successful etcd backup in 24 hours"
+            description: "The last successful etcd backup was more than 24 hours ago."
+
+        - alert: POPScheduledBackupMissed
+          expr: increase(pop_backup_schedule_missed_total[1h]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Scheduled backup was missed"
+            description: "A scheduled etcd backup was missed."
+
+    - name: pop.cluster
+      rules:
+        - alert: POPCertificateExpiringSoon
+          expr: (pop_certificate_expiry_timestamp - time()) < 604800
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Cluster certificate expiring soon"
+            description: "The kube-apiserver-to-kubelet-signer certificate expires in less than 7 days."
+
+    - name: pop.power
+      rules:
+        - alert: POPPowerFailureDetected
+          expr: pop_power_status == 1
+          for: 30s
+          labels:
+            severity: critical
+          annotations:
+            summary: "Power failure detected — cluster running on battery"
+            description: "The UPS has reported a power failure. The cluster is running on battery backup."
+
+        - alert: POPAutonomousShutdownImminent
+          expr: pop_autonomous_shutdown_countdown_seconds > 0 and pop_autonomous_shutdown_countdown_seconds < 300
+          for: 10s
+          labels:
+            severity: critical
+          annotations:
+            summary: "Autonomous cluster shutdown imminent"
+            description: "The cluster will autonomously shut down in less than 5 minutes due to sustained power failure."

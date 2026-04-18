@@ -1,0 +1,148 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - persistentvolumeclaims
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests/approval
+  verbs:
+  - update
+- apiGroups:
+  - certificates.k8s.io
+  resourceNames:
+  - kubernetes.io/kube-apiserver-client-kubelet
+  - kubernetes.io/kubelet-serving
+  resources:
+  - signers
+  verbs:
+  - approve
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clusteroperators
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - pop.openshift.io
+  resources:
+  - backupschedules
+  - clusterrestarts
+  - clustershutdowns
+  - etcdbackups
+  - powerevents
+  - powerprotectionconfigs
+  - workloadevacuations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - pop.openshift.io
+  resources:
+  - backupschedules/finalizers
+  - clusterrestarts/finalizers
+  - clustershutdowns/finalizers
+  - etcdbackups/finalizers
+  - powerevents/finalizers
+  - powerprotectionconfigs/finalizers
+  - workloadevacuations/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - pop.openshift.io
+  resources:
+  - backupschedules/status
+  - clusterrestarts/status
+  - clustershutdowns/status
+  - etcdbackups/status
+  - powerevents/status
+  - powerprotectionconfigs/status
+  - workloadevacuations/status
+  verbs:
+  - get
+  - patch
+  - update

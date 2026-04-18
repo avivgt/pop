@@ -1,0 +1,175 @@
+[
+  {
+    "type": "console.flag/model",
+    "properties": {
+      "model": {
+        "group": "pop.openshift.io",
+        "version": "v1alpha1",
+        "kind": "EtcdBackup"
+      },
+      "flag": "POP_ETCDBACKUP"
+    }
+  },
+  {
+    "type": "console.navigation/section",
+    "properties": {
+      "id": "cluster-lifecycle",
+      "perspective": "admin",
+      "name": "Cluster Lifecycle",
+      "insertAfter": "workloads"
+    },
+    "flags": {
+      "required": ["POP_ETCDBACKUP"]
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "cluster-lifecycle-overview",
+      "perspective": "admin",
+      "section": "cluster-lifecycle",
+      "name": "Overview",
+      "href": "/cluster-lifecycle"
+    },
+    "flags": {
+      "required": ["POP_ETCDBACKUP"]
+    }
+  },
+  {
+    "type": "console.navigation/resource-ns",
+    "properties": {
+      "id": "etcdbackups-nav",
+      "perspective": "admin",
+      "section": "cluster-lifecycle",
+      "name": "EtcdBackups",
+      "model": {
+        "group": "pop.openshift.io",
+        "version": "v1alpha1",
+        "kind": "EtcdBackup"
+      }
+    },
+    "flags": {
+      "required": ["POP_ETCDBACKUP"]
+    }
+  },
+  {
+    "type": "console.navigation/resource-ns",
+    "properties": {
+      "id": "backupschedules-nav",
+      "perspective": "admin",
+      "section": "cluster-lifecycle",
+      "name": "BackupSchedules",
+      "model": {
+        "group": "pop.openshift.io",
+        "version": "v1alpha1",
+        "kind": "BackupSchedule"
+      }
+    },
+    "flags": {
+      "required": ["POP_ETCDBACKUP"]
+    }
+  },
+  {
+    "type": "console.navigation/resource-ns",
+    "properties": {
+      "id": "clustershutdowns-nav",
+      "perspective": "admin",
+      "section": "cluster-lifecycle",
+      "name": "ClusterShutdowns",
+      "model": {
+        "group": "pop.openshift.io",
+        "version": "v1alpha1",
+        "kind": "ClusterShutdown"
+      }
+    },
+    "flags": {
+      "required": ["POP_ETCDBACKUP"]
+    }
+  },
+  {
+    "type": "console.navigation/resource-ns",
+    "properties": {
+      "id": "clusterrestarts-nav",
+      "perspective": "admin",
+      "section": "cluster-lifecycle",
+      "name": "ClusterRestarts",
+      "model": {
+        "group": "pop.openshift.io",
+        "version": "v1alpha1",
+        "kind": "ClusterRestart"
+      }
+    },
+    "flags": {
+      "required": ["POP_ETCDBACKUP"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/cluster-lifecycle",
+      "perspective": "admin",
+      "component": {
+        "$codeRef": "DashboardPage"
+      }
+    },
+    "flags": {
+      "required": ["POP_ETCDBACKUP"]
+    }
+  },
+  {
+    "type": "console.model-metadata",
+    "properties": {
+      "model": {
+        "group": "pop.openshift.io",
+        "version": "v1alpha1",
+        "kind": "EtcdBackup"
+      },
+      "label": "EtcdBackup",
+      "labelPlural": "EtcdBackups",
+      "abbr": "EB",
+      "color": "#0066CC"
+    }
+  },
+  {
+    "type": "console.model-metadata",
+    "properties": {
+      "model": {
+        "group": "pop.openshift.io",
+        "version": "v1alpha1",
+        "kind": "BackupSchedule"
+      },
+      "label": "BackupSchedule",
+      "labelPlural": "BackupSchedules",
+      "abbr": "BS",
+      "color": "#6A6E73"
+    }
+  },
+  {
+    "type": "console.model-metadata",
+    "properties": {
+      "model": {
+        "group": "pop.openshift.io",
+        "version": "v1alpha1",
+        "kind": "ClusterShutdown"
+      },
+      "label": "ClusterShutdown",
+      "labelPlural": "ClusterShutdowns",
+      "abbr": "CS",
+      "color": "#C9190B"
+    }
+  },
+  {
+    "type": "console.model-metadata",
+    "properties": {
+      "model": {
+        "group": "pop.openshift.io",
+        "version": "v1alpha1",
+        "kind": "ClusterRestart"
+      },
+      "label": "ClusterRestart",
+      "labelPlural": "ClusterRestarts",
+      "abbr": "CR",
+      "color": "#F0AB00"
+    }
+  }
+]

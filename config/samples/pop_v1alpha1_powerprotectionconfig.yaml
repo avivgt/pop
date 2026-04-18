@@ -1,0 +1,33 @@
+apiVersion: pop.openshift.io/v1alpha1
+kind: PowerProtectionConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: pop
+    app.kubernetes.io/managed-by: kustomize
+  name: default
+  namespace: pop-system
+spec:
+  enabled: true
+  clusterPriority: Standard           # Critical | Standard | BestEffort
+  batteryCapacityMinutes: 15
+  powerConfirmationSeconds: 120       # wait 2 min before confirming outage
+  autonomousShutdown: true            # auto-shutdown after confirmation + delay
+
+  backupConfig:
+    pvcName: etcd-backup-storage
+    shutdownDelayMinutes: 1
+
+  alertEndpoint:
+    port: 8082
+    authTokenSecret: psu-alert-token  # Secret with "token" key for bearer auth
+
+  notification:
+    kubernetesEvents:
+      enabled: true
+    webhook:
+      enabled: true
+      url: "https://hooks.slack.com/services/REPLACE_ME"
+    smtp:
+      enabled: false
+    alertmanager:
+      enabled: true

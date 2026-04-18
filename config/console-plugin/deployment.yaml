@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pop-console-plugin
+  namespace: pop-system
+  labels:
+    app: pop-console-plugin
+    app.kubernetes.io/component: console-plugin
+    app.kubernetes.io/part-of: pop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pop-console-plugin
+  template:
+    metadata:
+      labels:
+        app: pop-console-plugin
+    spec:
+      containers:
+        - name: pop-console-plugin
+          image: pop-console-plugin:latest
+          ports:
+            - containerPort: 9443
+              protocol: TCP
+              name: http
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9443
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9443
+            initialDelaySeconds: 5
+            periodSeconds: 10
