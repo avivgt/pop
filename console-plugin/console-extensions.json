@@ -7,45 +7,45 @@
         "version": "v1alpha1",
         "kind": "ClusterLifecycleConfig"
       },
-      "flag": "POP_CLUSTER_LIFECYCLE"
+      "flag": "POP_POWER_MANAGEMENT"
     }
   },
   {
     "type": "console.navigation/section",
     "properties": {
-      "id": "cluster-lifecycle",
+      "id": "power-management",
       "perspective": "admin",
-      "name": "Cluster Lifecycle",
-      "insertAfter": "workloads"
+      "name": "Power Management",
+      "insertAfter": "compute"
     },
     "flags": {
-      "required": ["POP_CLUSTER_LIFECYCLE"]
+      "required": ["POP_POWER_MANAGEMENT"]
     }
   },
   {
     "type": "console.navigation/href",
     "properties": {
-      "id": "cluster-lifecycle-dashboard",
+      "id": "pop-dashboard",
       "perspective": "admin",
-      "section": "cluster-lifecycle",
-      "name": "Dashboard",
-      "href": "/cluster-lifecycle"
+      "section": "power-management",
+      "name": "POP Dashboard",
+      "href": "/power-management"
     },
     "flags": {
-      "required": ["POP_CLUSTER_LIFECYCLE"]
+      "required": ["POP_POWER_MANAGEMENT"]
     }
   },
   {
     "type": "console.page/route",
     "properties": {
-      "path": "/cluster-lifecycle",
+      "path": "/power-management",
       "perspective": "admin",
       "component": {
         "$codeRef": "DashboardPage"
       }
     },
     "flags": {
-      "required": ["POP_CLUSTER_LIFECYCLE"]
+      "required": ["POP_POWER_MANAGEMENT"]
     }
   },
   {
@@ -56,10 +56,10 @@
         "version": "v1alpha1",
         "kind": "ClusterLifecycleConfig"
       },
-      "label": "ClusterLifecycleConfig",
-      "labelPlural": "ClusterLifecycleConfigs",
-      "abbr": "CLC",
-      "color": "#0066CC"
+      "label": "Power Management",
+      "labelPlural": "Power Management Configs",
+      "abbr": "POP",
+      "color": "#F0AB00"
     }
   }
 ]
