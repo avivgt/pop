@@ -1,0 +1,23 @@
+# permissions for end users to view clusterlifecycleconfigs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: pop
+    app.kubernetes.io/managed-by: kustomize
+  name: clusterlifecycleconfig-viewer-role
+rules:
+- apiGroups:
+  - pop.openshift.io
+  resources:
+  - clusterlifecycleconfigs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - pop.openshift.io
+  resources:
+  - clusterlifecycleconfigs/status
+  verbs:
+  - get

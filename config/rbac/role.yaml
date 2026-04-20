@@ -106,6 +106,7 @@ rules:
   - pop.openshift.io
   resources:
   - backupschedules
+  - clusterlifecycleconfigs
   - clusterrestarts
   - clustershutdowns
   - etcdbackups
@@ -124,6 +125,7 @@ rules:
   - pop.openshift.io
   resources:
   - backupschedules/finalizers
+  - clusterlifecycleconfigs/finalizers
   - clusterrestarts/finalizers
   - clustershutdowns/finalizers
   - etcdbackups/finalizers
@@ -136,6 +138,7 @@ rules:
   - pop.openshift.io
   resources:
   - backupschedules/status
+  - clusterlifecycleconfigs/status
   - clusterrestarts/status
   - clustershutdowns/status
   - etcdbackups/status

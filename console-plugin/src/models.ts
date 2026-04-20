@@ -1,5 +1,16 @@
 import { K8sModel } from '@openshift-console/dynamic-plugin-sdk';
 
+export const ClusterLifecycleConfigModel: K8sModel = {
+  apiGroup: 'pop.openshift.io',
+  apiVersion: 'v1alpha1',
+  kind: 'ClusterLifecycleConfig',
+  plural: 'clusterlifecycleconfigs',
+  label: 'ClusterLifecycleConfig',
+  labelPlural: 'ClusterLifecycleConfigs',
+  abbr: 'CLC',
+  namespaced: true,
+};
+
 export const EtcdBackupModel: K8sModel = {
   apiGroup: 'pop.openshift.io',
   apiVersion: 'v1alpha1',
@@ -41,5 +52,16 @@ export const ClusterRestartModel: K8sModel = {
   label: 'ClusterRestart',
   labelPlural: 'ClusterRestarts',
   abbr: 'CR',
+  namespaced: true,
+};
+
+export const PowerEventModel: K8sModel = {
+  apiGroup: 'pop.openshift.io',
+  apiVersion: 'v1alpha1',
+  kind: 'PowerEvent',
+  plural: 'powerevents',
+  label: 'PowerEvent',
+  labelPlural: 'PowerEvents',
+  abbr: 'PE',
   namespaced: true,
 };

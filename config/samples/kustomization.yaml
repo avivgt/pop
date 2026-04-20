@@ -7,4 +7,5 @@ resources:
 - pop_v1alpha1_powerprotectionconfig.yaml
 - pop_v1alpha1_powerevent.yaml
 - pop_v1alpha1_workloadevacuation.yaml
+- pop_v1alpha1_clusterlifecycleconfig.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

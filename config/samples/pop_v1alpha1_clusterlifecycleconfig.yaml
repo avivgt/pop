@@ -1,0 +1,39 @@
+apiVersion: pop.openshift.io/v1alpha1
+kind: ClusterLifecycleConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: pop
+    app.kubernetes.io/managed-by: kustomize
+  name: default
+  namespace: pop-system
+spec:
+  backup:
+    storage:
+      pvcName: etcd-backup-storage
+    schedule:
+      enabled: true
+      frequency: Daily
+      time: "02:00"
+    retention:
+      count: 10
+      days: 30
+    timeoutMinutes: 15
+
+  shutdown:
+    defaultDelayMinutes: 1
+    cordonNodes: true
+    notifyApplications: true
+
+  powerProtection:
+    enabled: true
+    clusterPriority: Standard
+    batteryCapacityMinutes: 15
+    powerConfirmationSeconds: 120
+    autonomousShutdown: false
+    alertEndpoint:
+      port: 8082
+      authTokenSecret: psu-alert-token
+
+  notification:
+    kubernetesEvents:
+      enabled: true

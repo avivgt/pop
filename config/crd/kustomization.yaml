@@ -9,6 +9,7 @@ resources:
 - bases/pop.openshift.io_powerprotectionconfigs.yaml
 - bases/pop.openshift.io_powerevents.yaml
 - bases/pop.openshift.io_workloadevacuations.yaml
+- bases/pop.openshift.io_clusterlifecycleconfigs.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
@@ -25,6 +26,7 @@ patches:
 #- path: patches/cainjection_in_powerprotectionconfigs.yaml
 #- path: patches/cainjection_in_powerevents.yaml
 #- path: patches/cainjection_in_workloadevacuations.yaml
+#- path: patches/cainjection_in_clusterlifecycleconfigs.yaml
 # +kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # [WEBHOOK] To enable webhook, uncomment the following section
