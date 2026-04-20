@@ -35,8 +35,22 @@ export interface BackupScheduleConfig {
   dayOfMonth?: number;
 }
 
+export interface S3Config {
+  bucket?: string;
+  region?: string;
+  endpoint?: string;
+  credentialsSecret?: string;
+  prefix?: string;
+}
+
+export interface ExportTarget {
+  type?: string;
+  s3?: S3Config;
+}
+
 export interface BackupStorageConfig {
   pvcName: string;
+  exportTarget?: ExportTarget;
 }
 
 export interface LifecycleBackupConfig {
@@ -45,12 +59,29 @@ export interface LifecycleBackupConfig {
   timeoutMinutes?: number;
 }
 
+export interface AlertEndpointConfig {
+  port?: number;
+  authTokenSecret?: string;
+}
+
 export interface LifecyclePowerConfig {
   enabled: boolean;
   clusterPriority?: string;
   batteryCapacityMinutes?: number;
   powerConfirmationSeconds?: number;
   autonomousShutdown?: boolean;
+  alertEndpoint?: AlertEndpointConfig;
+  managementURL?: string;
+}
+
+export interface WebhookNotificationConfig {
+  enabled: boolean;
+  url?: string;
+}
+
+export interface NotificationConfig {
+  webhook?: WebhookNotificationConfig;
+  kubernetesEvents?: { enabled: boolean };
 }
 
 export interface ClusterLifecycleConfigResource extends K8sResourceCommon {
@@ -62,6 +93,7 @@ export interface ClusterLifecycleConfigResource extends K8sResourceCommon {
       notifyApplications?: boolean;
     };
     powerProtection?: LifecyclePowerConfig;
+    notification?: NotificationConfig;
   };
   status?: {
     backup?: BackupStatusSummary;

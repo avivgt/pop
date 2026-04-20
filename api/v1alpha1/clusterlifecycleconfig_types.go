@@ -156,6 +156,12 @@ type LifecyclePowerConfig struct {
 	// AlertEndpoint configures the PSU webhook receiver.
 	// +optional
 	AlertEndpoint *AlertEndpointConfig `json:"alertEndpoint,omitempty"`
+
+	// ManagementURL is the URL of the UPS/PDU management interface
+	// (e.g. "https://192.168.1.100" for an APC, Eaton, or Redfish endpoint).
+	// Used for display in the dashboard and future health-checking.
+	// +optional
+	ManagementURL string `json:"managementURL,omitempty"`
 }
 
 // --- Top-level spec ---

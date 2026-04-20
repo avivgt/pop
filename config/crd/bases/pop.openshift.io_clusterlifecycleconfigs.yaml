@@ -330,6 +330,12 @@ spec:
                     default: false
                     description: Enabled activates UPS/PSU power protection.
                     type: boolean
+                  managementURL:
+                    description: |-
+                      ManagementURL is the URL of the UPS/PDU management interface
+                      (e.g. "https://192.168.1.100" for an APC, Eaton, or Redfish endpoint).
+                      Used for display in the dashboard and future health-checking.
+                    type: string
                   powerConfirmationSeconds:
                     default: 120
                     description: PowerConfirmationSeconds is the wait before confirming

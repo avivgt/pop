@@ -26,6 +26,7 @@ import StatusBar from './StatusBar';
 import BackupSection from './BackupSection';
 import OperationsSection from './OperationsSection';
 import PowerSection from './PowerSection';
+import SettingsSection from './SettingsSection';
 
 const NAMESPACE = 'pop-system';
 
@@ -173,6 +174,10 @@ const DashboardPage: React.FC = () => {
           powerEventsLoaded={powerEventsLoaded}
           namespace={NAMESPACE}
         />
+      </PageSection>
+
+      <PageSection>
+        <SettingsSection config={config} namespace={NAMESPACE} />
       </PageSection>
     </>
   );
