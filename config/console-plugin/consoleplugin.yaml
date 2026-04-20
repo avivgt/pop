@@ -3,7 +3,7 @@ kind: ConsolePlugin
 metadata:
   name: pop-console-plugin
 spec:
-  displayName: "POP - Platform Outage Provisioner"
+  displayName: "POP - Power Outage Provisioner"
   backend:
     type: Service
     service:

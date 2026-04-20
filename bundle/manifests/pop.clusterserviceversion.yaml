@@ -258,13 +258,13 @@ spec:
       name: workloadevacuations.pop.openshift.io
       version: v1alpha1
   description: |
-    POP (Platform Outage Provisioner) automates OpenShift cluster lifecycle operations:
+    POP (Power Outage Provisioner) automates OpenShift cluster lifecycle operations:
     - Etcd backup with PVC and S3 export
     - Scheduled backups with retention policies
     - Graceful cluster shutdown following OpenShift documentation
     - Cluster restart with automatic CSR approval and operator health verification
     - OpenShift Console plugin for visual management
-  displayName: POP - Platform Outage Provisioner
+  displayName: POP - Power Outage Provisioner
   icon:
   - base64data: ""
     mediatype: image/png

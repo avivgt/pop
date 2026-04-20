@@ -18,7 +18,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 LABEL name="pop-operator" \
       vendor="POP Project" \
       version="0.1.0" \
-      summary="POP Operator - Platform Outage Provisioner" \
+      summary="POP Operator - Power Outage Provisioner" \
       description="Automates OpenShift control plane backup and graceful cluster shutdown" \
       io.k8s.display-name="POP Operator" \
       io.openshift.tags="backup,shutdown,etcd,maintenance"

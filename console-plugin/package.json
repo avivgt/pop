@@ -10,7 +10,7 @@
   "consolePlugin": {
     "name": "pop-console-plugin",
     "version": "0.1.0",
-    "displayName": "POP - Platform Outage Provisioner",
+    "displayName": "POP - Power Outage Provisioner",
     "description": "Manage etcd backups and cluster lifecycle operations",
     "exposedModules": {
       "DashboardPage": "./components/DashboardPage"

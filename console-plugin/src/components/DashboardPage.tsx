@@ -113,7 +113,7 @@ const DashboardPage: React.FC = () => {
     return (
       <>
         <PageSection variant="light">
-          <Title headingLevel="h1">POP - Cluster Lifecycle Management</Title>
+          <Title headingLevel="h1">POP - Power Outage Provisioner</Title>
         </PageSection>
         <PageSection>
           <EmptyState>
@@ -128,7 +128,7 @@ const DashboardPage: React.FC = () => {
   return (
     <>
       <PageSection variant="light">
-        <Title headingLevel="h1">POP - Cluster Lifecycle Management</Title>
+        <Title headingLevel="h1">POP - Power Outage Provisioner</Title>
       </PageSection>
 
       {hasError && (
