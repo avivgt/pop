@@ -10,7 +10,8 @@ import {
   Button,
   ActionGroup,
   Alert,
-  ExpandableSection,
+  Title,
+  Divider,
   Grid,
   GridItem,
   FormSelect,
@@ -137,7 +138,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, namespace }) 
 
         <Form>
           {/* Backup Schedule */}
-          <ExpandableSection toggleText="Backup Schedule" isExpanded>
+          <Title headingLevel="h3" style={{ marginBottom: 12 }}>Backup Schedule</Title>
             <Grid hasGutter>
               <GridItem span={4}>
                 <FormGroup label="Scheduled Backups" fieldId="schedule-enabled">
@@ -179,10 +180,11 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, namespace }) 
                 </FormGroup>
               </GridItem>
             </Grid>
-          </ExpandableSection>
+
+          <Divider style={{ margin: '24px 0' }} />
 
           {/* Storage */}
-          <ExpandableSection toggleText="Backup Storage" isExpanded>
+          <Title headingLevel="h3" style={{ marginBottom: 12 }}>Backup Storage</Title>
             <Grid hasGutter>
               <GridItem span={6}>
                 <FormGroup label="PVC Name" fieldId="pvc-name" isRequired>
@@ -245,10 +247,11 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, namespace }) 
                 </>
               )}
             </Grid>
-          </ExpandableSection>
+
+          <Divider style={{ margin: '24px 0' }} />
 
           {/* PSU / Power */}
-          <ExpandableSection toggleText="PSU Management">
+          <Title headingLevel="h3" style={{ marginBottom: 12 }}>PSU Management</Title>
             <Grid hasGutter>
               <GridItem span={6}>
                 <FormGroup label="UPS/PDU Management URL" fieldId="psu-url">
@@ -281,10 +284,11 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, namespace }) 
                 </FormGroup>
               </GridItem>
             </Grid>
-          </ExpandableSection>
+
+          <Divider style={{ margin: '24px 0' }} />
 
           {/* Notifications */}
-          <ExpandableSection toggleText="Notifications">
+          <Title headingLevel="h3" style={{ marginBottom: 12 }}>Notifications</Title>
             <Grid hasGutter>
               <GridItem span={4}>
                 <FormGroup label="Webhook Notifications" fieldId="webhook-enabled">
@@ -310,7 +314,8 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, namespace }) 
                 </GridItem>
               )}
             </Grid>
-          </ExpandableSection>
+
+          <Divider style={{ margin: '24px 0' }} />
 
           <ActionGroup>
             <Button variant="primary" onClick={handleSave} isLoading={saving} isDisabled={saving || !pvcName}>
