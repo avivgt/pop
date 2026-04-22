@@ -16,7 +16,7 @@
       "id": "backup-and-restore",
       "perspective": "admin",
       "name": "Backup and Restore",
-      "insertAfter": "storage"
+      "insertAfter": "power-management"
     },
     "flags": {
       "required": ["POP_ENABLED"]
