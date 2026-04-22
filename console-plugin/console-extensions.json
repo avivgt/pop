@@ -7,19 +7,19 @@
         "version": "v1alpha1",
         "kind": "ClusterLifecycleConfig"
       },
-      "flag": "POP_POWER_MANAGEMENT"
+      "flag": "POP_ENABLED"
     }
   },
   {
     "type": "console.navigation/section",
     "properties": {
-      "id": "power-management",
+      "id": "backup-and-restore",
       "perspective": "admin",
-      "name": "Power Management",
-      "insertAfter": "compute"
+      "name": "Backup and Restore",
+      "insertAfter": "storage"
     },
     "flags": {
-      "required": ["POP_POWER_MANAGEMENT"]
+      "required": ["POP_ENABLED"]
     }
   },
   {
@@ -27,25 +27,25 @@
     "properties": {
       "id": "pop-dashboard",
       "perspective": "admin",
-      "section": "power-management",
+      "section": "backup-and-restore",
       "name": "POP Dashboard",
-      "href": "/power-management"
+      "href": "/backup-and-restore"
     },
     "flags": {
-      "required": ["POP_POWER_MANAGEMENT"]
+      "required": ["POP_ENABLED"]
     }
   },
   {
     "type": "console.page/route",
     "properties": {
-      "path": "/power-management",
+      "path": "/backup-and-restore",
       "perspective": "admin",
       "component": {
         "$codeRef": "DashboardPage"
       }
     },
     "flags": {
-      "required": ["POP_POWER_MANAGEMENT"]
+      "required": ["POP_ENABLED"]
     }
   },
   {
@@ -56,10 +56,10 @@
         "version": "v1alpha1",
         "kind": "ClusterLifecycleConfig"
       },
-      "label": "Power Management",
-      "labelPlural": "Power Management Configs",
+      "label": "Backup and Restore",
+      "labelPlural": "Backup and Restore Configs",
       "abbr": "POP",
-      "color": "#F0AB00"
+      "color": "#0066CC"
     }
   }
 ]
