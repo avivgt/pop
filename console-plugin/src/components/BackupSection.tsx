@@ -13,7 +13,9 @@ import {
   EmptyState,
   EmptyStateBody,
   Title,
+  Tooltip,
 } from '@patternfly/react-core';
+import { RedhatIcon } from '@patternfly/react-icons';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import {
   ClusterLifecycleConfigResource,
@@ -53,18 +55,32 @@ const BackupSection: React.FC<BackupSectionProps> = ({
   return (
     <Card>
       <CardTitle>
-        <Title headingLevel="h2">Backups</Title>
+        <Title headingLevel="h2">etcd Backup</Title>
       </CardTitle>
       <CardBody>
         <Grid hasGutter>
-          <GridItem span={4}>
-            <Button
-              variant="primary"
-              onClick={() => setIsModalOpen(true)}
-              isBlock
-            >
-              Backup Now
-            </Button>
+          <GridItem span={4} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <Tooltip content="Trigger an etcd backup now">
+              <Button
+                variant="plain"
+                onClick={() => setIsModalOpen(true)}
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: '50%',
+                  backgroundColor: '#EE0000',
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 40,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                }}
+              >
+                <RedhatIcon />
+              </Button>
+            </Tooltip>
+            <div style={{ marginTop: 8, fontWeight: 600 }}>Backup Now</div>
           </GridItem>
           <GridItem span={8}>
             <DescriptionList isCompact isHorizontal>
