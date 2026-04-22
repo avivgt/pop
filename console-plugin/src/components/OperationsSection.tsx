@@ -78,7 +78,6 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
       <CardBody>
         <List isPlain style={{ marginBottom: 16 }}>
           <ListItem><strong>Shutdown Cluster</strong> — Backs up etcd, cordons nodes, runs pre-shutdown hooks, and gracefully powers down all nodes.</ListItem>
-          <ListItem><strong>Post-Restart Recovery</strong> — Runs automatically after the cluster boots back up. Approves pending CSRs and verifies all operators are healthy.</ListItem>
         </List>
 
         <div style={{ marginBottom: 16 }}>
