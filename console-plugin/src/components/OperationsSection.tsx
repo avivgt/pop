@@ -4,8 +4,6 @@ import {
   CardTitle,
   CardBody,
   Button,
-  Flex,
-  FlexItem,
   EmptyState,
   EmptyStateBody,
   Title,
@@ -21,7 +19,6 @@ import {
 import { formatTimestamp } from '../utils';
 import PhaseLabel from './shared/PhaseLabel';
 import ShutdownModal from './actions/ShutdownModal';
-import RestartModal from './actions/RestartModal';
 
 interface OperationRow {
   name: string;
@@ -48,7 +45,6 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
   namespace,
 }) => {
   const [isShutdownOpen, setIsShutdownOpen] = React.useState(false);
-  const [isRestartOpen, setIsRestartOpen] = React.useState(false);
 
   const pvcName = config?.spec?.backup?.storage?.pvcName || 'etcd-backup-pvc';
   const loaded = shutdownsLoaded && restartsLoaded;
@@ -62,7 +58,7 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
     })),
     ...(restarts || []).map((r) => ({
       name: r.metadata?.name || '-',
-      kind: 'Restart',
+      kind: 'Recovery',
       phase: r.status?.phase,
       createdAt: r.metadata?.creationTimestamp,
     })),
@@ -82,21 +78,14 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
       <CardBody>
         <List isPlain style={{ marginBottom: 16 }}>
           <ListItem><strong>Shutdown Cluster</strong> — Backs up etcd, cordons nodes, runs pre-shutdown hooks, and gracefully powers down all nodes.</ListItem>
-          <ListItem><strong>Restart Cluster</strong> — Waits for nodes to come back online, approves pending CSRs, and verifies all cluster operators are healthy.</ListItem>
+          <ListItem><strong>Post-Restart Recovery</strong> — Runs automatically after the cluster boots back up. Approves pending CSRs and verifies all operators are healthy.</ListItem>
         </List>
 
-        <Flex spaceItems={{ default: 'spaceItemsMd' }} style={{ marginBottom: 16 }}>
-          <FlexItem>
-            <Button variant="danger" onClick={() => setIsShutdownOpen(true)}>
-              Shutdown Cluster
-            </Button>
-          </FlexItem>
-          <FlexItem>
-            <Button variant="primary" onClick={() => setIsRestartOpen(true)}>
-              Restart Cluster
-            </Button>
-          </FlexItem>
-        </Flex>
+        <div style={{ marginBottom: 16 }}>
+          <Button variant="danger" onClick={() => setIsShutdownOpen(true)}>
+            Shutdown Cluster
+          </Button>
+        </div>
 
         <Title headingLevel="h3" style={{ marginBottom: 8 }}>
           Recent operations
@@ -140,11 +129,6 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
         isOpen={isShutdownOpen}
         onClose={() => setIsShutdownOpen(false)}
         pvcName={pvcName}
-        namespace={namespace}
-      />
-      <RestartModal
-        isOpen={isRestartOpen}
-        onClose={() => setIsRestartOpen(false)}
         namespace={namespace}
       />
     </Card>
