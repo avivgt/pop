@@ -9,6 +9,8 @@ import {
   EmptyState,
   EmptyStateBody,
   Title,
+  List,
+  ListItem,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import {
@@ -78,6 +80,11 @@ const OperationsSection: React.FC<OperationsSectionProps> = ({
         <Title headingLevel="h2">Cluster Operations</Title>
       </CardTitle>
       <CardBody>
+        <List isPlain style={{ marginBottom: 16 }}>
+          <ListItem><strong>Shutdown Cluster</strong> — Backs up etcd, cordons nodes, runs pre-shutdown hooks, and gracefully powers down all nodes.</ListItem>
+          <ListItem><strong>Restart Cluster</strong> — Waits for nodes to come back online, approves pending CSRs, and verifies all cluster operators are healthy.</ListItem>
+        </List>
+
         <Flex spaceItems={{ default: 'spaceItemsMd' }} style={{ marginBottom: 16 }}>
           <FlexItem>
             <Button variant="danger" onClick={() => setIsShutdownOpen(true)}>
