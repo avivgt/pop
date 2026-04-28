@@ -231,6 +231,7 @@ func (r *EtcdBackupReconciler) buildBackupJob(backup *popv1alpha1.EtcdBackup, jo
 	backupScript := `set -euo pipefail
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_DIR="/backup/${TIMESTAMP}"
+MAX_BACKUPS=5
 mkdir -p "${BACKUP_DIR}"
 
 echo "Starting etcd backup on $(hostname) at ${TIMESTAMP}"
@@ -252,6 +253,18 @@ if [ "${FILE_COUNT}" -lt 2 ]; then
   echo "ERROR: Expected at least 2 backup files, found ${FILE_COUNT}"
   exit 1
 fi
+
+echo "Enforcing PVC retention (keeping last ${MAX_BACKUPS} backups)..."
+BACKUP_COUNT=$(ls -1d /backup/2* 2>/dev/null | wc -l)
+if [ "${BACKUP_COUNT}" -gt "${MAX_BACKUPS}" ]; then
+  REMOVE_COUNT=$((BACKUP_COUNT - MAX_BACKUPS))
+  ls -1d /backup/2* | sort | head -n "${REMOVE_COUNT}" | while read OLD_DIR; do
+    echo "Removing old backup: ${OLD_DIR}"
+    rm -rf "${OLD_DIR}"
+  done
+fi
+echo "PVC usage after cleanup:"
+df -h /backup
 
 echo "Backup completed successfully to ${BACKUP_DIR}"
 `
