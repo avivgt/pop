@@ -17,8 +17,11 @@ limitations under the License.
 package controller
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -28,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -38,7 +42,8 @@ import (
 
 type EtcdBackupReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme    *runtime.Scheme
+	Clientset kubernetes.Interface
 }
 
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=etcdbackups,verbs=get;list;watch;create;update;patch;delete
@@ -47,6 +52,7 @@ type EtcdBackupReconciler struct {
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;delete
+// +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
@@ -106,28 +112,45 @@ func (r *EtcdBackupReconciler) reconcileValidating(ctx context.Context, backup *
 		return ctrl.Result{}, err
 	}
 
-	controlPlaneNodes, err := r.listControlPlaneNodes(ctx)
+	readyNodes, totalNodes, err := r.listControlPlaneNodes(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if len(controlPlaneNodes) == 0 {
-		return r.setFailed(ctx, backup, "no control plane nodes found")
+	if len(readyNodes) == 0 {
+		return r.setFailed(ctx, backup, fmt.Sprintf("no ready control plane nodes (total: %d)", totalNodes))
+	}
+
+	if len(readyNodes) < totalNodes {
+		logger.Info("degraded control plane", "ready", len(readyNodes), "total", totalNodes)
+		meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
+			Type:    "ControlPlaneHealth",
+			Status:  metav1.ConditionFalse,
+			Reason:  "DegradedControlPlane",
+			Message: fmt.Sprintf("%d of %d control plane nodes ready", len(readyNodes), totalNodes),
+		})
+	} else {
+		meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
+			Type:    "ControlPlaneHealth",
+			Status:  metav1.ConditionTrue,
+			Reason:  "AllNodesReady",
+			Message: fmt.Sprintf("%d of %d control plane nodes ready", len(readyNodes), totalNodes),
+		})
 	}
 
 	selectedNode := backup.Spec.ControlPlaneNode
 	if selectedNode == "" {
-		selectedNode = controlPlaneNodes[0].Name
+		selectedNode = readyNodes[0].Name
 		logger.Info("auto-selected control plane node", "node", selectedNode)
 	} else {
 		found := false
-		for _, n := range controlPlaneNodes {
+		for _, n := range readyNodes {
 			if n.Name == selectedNode {
 				found = true
 				break
 			}
 		}
 		if !found {
-			return r.setFailed(ctx, backup, fmt.Sprintf("specified node %q is not a control plane node", selectedNode))
+			return r.setFailed(ctx, backup, fmt.Sprintf("specified node %q is not a ready control plane node", selectedNode))
 		}
 	}
 
@@ -189,6 +212,7 @@ func (r *EtcdBackupReconciler) reconcileRunning(ctx context.Context, backup *pop
 		if backup.Status.StartTime != nil {
 			popmetrics.EtcdBackupDuration.Observe(time.Since(backup.Status.StartTime.Time).Seconds())
 		}
+		r.parseBackupMetadata(ctx, backup)
 		meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
 			Type:    "Ready",
 			Status:  metav1.ConditionTrue,
@@ -201,13 +225,9 @@ func (r *EtcdBackupReconciler) reconcileRunning(ctx context.Context, backup *pop
 		return ctrl.Result{}, nil
 	}
 
-	if existingJob.Status.Failed > 0 {
-		backoffLimit := int32(2)
-		if existingJob.Spec.BackoffLimit != nil {
-			backoffLimit = *existingJob.Spec.BackoffLimit
-		}
-		if existingJob.Status.Failed >= backoffLimit {
-			return r.setFailed(ctx, backup, fmt.Sprintf("backup job failed after %d attempts", existingJob.Status.Failed))
+	for _, condition := range existingJob.Status.Conditions {
+		if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
+			return r.setFailed(ctx, backup, fmt.Sprintf("backup job failed: %s", condition.Message))
 		}
 	}
 
@@ -228,10 +248,27 @@ func (r *EtcdBackupReconciler) buildBackupJob(backup *popv1alpha1.EtcdBackup, jo
 	backoffLimit := int32(2)
 	timeout := int64(backup.Spec.BackupTimeoutMinutes) * 60
 
+	retentionCount := backup.Spec.RetentionCount
+	if retentionCount <= 0 {
+		retentionCount = 5
+	}
+
 	backupScript := `set -euo pipefail
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_DIR="/backup/${TIMESTAMP}"
-MAX_BACKUPS=5
+
+echo "Enforcing PVC retention before backup (keeping last ${MAX_BACKUPS} backups)..."
+BACKUP_COUNT=$(ls -1d /backup/2* 2>/dev/null | wc -l)
+if [ "${BACKUP_COUNT}" -ge "${MAX_BACKUPS}" ]; then
+  REMOVE_COUNT=$((BACKUP_COUNT - MAX_BACKUPS + 1))
+  ls -1d /backup/2* | sort | head -n "${REMOVE_COUNT}" | while read OLD_DIR; do
+    echo "Removing old backup: ${OLD_DIR}"
+    rm -rf "${OLD_DIR}"
+  done
+fi
+echo "PVC usage before backup:"
+df -h /backup
+
 mkdir -p "${BACKUP_DIR}"
 
 echo "Starting etcd backup on $(hostname) at ${TIMESTAMP}"
@@ -254,17 +291,10 @@ if [ "${FILE_COUNT}" -lt 2 ]; then
   exit 1
 fi
 
-echo "Enforcing PVC retention (keeping last ${MAX_BACKUPS} backups)..."
-BACKUP_COUNT=$(ls -1d /backup/2* 2>/dev/null | wc -l)
-if [ "${BACKUP_COUNT}" -gt "${MAX_BACKUPS}" ]; then
-  REMOVE_COUNT=$((BACKUP_COUNT - MAX_BACKUPS))
-  ls -1d /backup/2* | sort | head -n "${REMOVE_COUNT}" | while read OLD_DIR; do
-    echo "Removing old backup: ${OLD_DIR}"
-    rm -rf "${OLD_DIR}"
-  done
-fi
-echo "PVC usage after cleanup:"
-df -h /backup
+BACKUP_SIZE=$(du -sb "${BACKUP_DIR}" | cut -f1)
+PVC_USED=$(df -B1 /backup | tail -1 | awk '{print $3}')
+PVC_CAPACITY=$(df -B1 /backup | tail -1 | awk '{print $2}')
+echo "BACKUP_META:${BACKUP_SIZE}:${PVC_USED}:${PVC_CAPACITY}"
 
 echo "Backup completed successfully to ${BACKUP_DIR}"
 `
@@ -291,9 +321,10 @@ echo "Backup completed successfully to ${BACKUP_DIR}"
 					},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyNever,
-					HostNetwork:   true,
-					HostPID:       true,
+					ServiceAccountName: "pop-controller-manager",
+					RestartPolicy:      corev1.RestartPolicyNever,
+					HostNetwork:        true,
+					HostPID:            true,
 					NodeSelector: map[string]string{
 						"kubernetes.io/hostname": backup.Status.BackupNode,
 					},
@@ -315,6 +346,12 @@ echo "Backup completed successfully to ${BACKUP_DIR}"
 							Image:   "registry.access.redhat.com/ubi9/ubi-minimal:latest",
 							Command: []string{"/bin/bash", "-c"},
 							Args:    []string{backupScript},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "MAX_BACKUPS",
+									Value: fmt.Sprintf("%d", retentionCount),
+								},
+							},
 							SecurityContext: &corev1.SecurityContext{
 								Privileged: &privileged,
 								RunAsUser:  &runAsRoot,
@@ -356,23 +393,101 @@ echo "Backup completed successfully to ${BACKUP_DIR}"
 	}
 }
 
-func (r *EtcdBackupReconciler) listControlPlaneNodes(ctx context.Context) ([]corev1.Node, error) {
+func (r *EtcdBackupReconciler) listControlPlaneNodes(ctx context.Context) (ready []corev1.Node, total int, err error) {
 	nodeList := &corev1.NodeList{}
 	if err := r.List(ctx, nodeList); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	var controlPlane []corev1.Node
 	for _, node := range nodeList.Items {
+		isCP := false
 		if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
-			controlPlane = append(controlPlane, node)
-			continue
+			isCP = true
 		}
 		if _, ok := node.Labels["node-role.kubernetes.io/control-plane"]; ok {
-			controlPlane = append(controlPlane, node)
+			isCP = true
+		}
+		if !isCP {
+			continue
+		}
+		total++
+		if isNodeReady(&node) {
+			ready = append(ready, node)
 		}
 	}
-	return controlPlane, nil
+	return ready, total, nil
+}
+
+
+func (r *EtcdBackupReconciler) parseBackupMetadata(ctx context.Context, backup *popv1alpha1.EtcdBackup) {
+	logger := log.FromContext(ctx)
+	if r.Clientset == nil {
+		return
+	}
+
+	podList := &corev1.PodList{}
+	if err := r.List(ctx, podList,
+		client.InNamespace(backup.Namespace),
+		client.MatchingLabels{"pop.openshift.io/backup": backup.Name},
+	); err != nil {
+		logger.Error(err, "failed to list backup pods for metadata")
+		return
+	}
+
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if pod.Status.Phase != corev1.PodSucceeded {
+			continue
+		}
+		logStream, err := r.Clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &corev1.PodLogOptions{}).Stream(ctx)
+		if err != nil {
+			logger.Error(err, "failed to read backup pod logs")
+			return
+		}
+		defer logStream.Close()
+
+		scanner := bufio.NewScanner(logStream)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if !strings.HasPrefix(line, "BACKUP_META:") {
+				continue
+			}
+			parts := strings.Split(strings.TrimPrefix(line, "BACKUP_META:"), ":")
+			if len(parts) != 3 {
+				continue
+			}
+			backupSize, _ := strconv.ParseInt(parts[0], 10, 64)
+			pvcUsed, _ := strconv.ParseInt(parts[1], 10, 64)
+			pvcCapacity, _ := strconv.ParseInt(parts[2], 10, 64)
+
+			backup.Status.BackupSizeBytes = backupSize
+			backup.Status.BackupSize = formatBytes(backupSize)
+			backup.Status.PVCUsedBytes = pvcUsed
+			backup.Status.PVCCapacityBytes = pvcCapacity
+			if pvcCapacity > 0 {
+				backup.Status.PVCUsagePercent = int32(pvcUsed * 100 / pvcCapacity)
+			}
+			logger.Info("parsed backup metadata",
+				"backupSize", backup.Status.BackupSize,
+				"pvcUsage", fmt.Sprintf("%d%%", backup.Status.PVCUsagePercent))
+			return
+		}
+	}
+}
+
+func formatBytes(bytes int64) string {
+	const (
+		gi = 1024 * 1024 * 1024
+		mi = 1024 * 1024
+	)
+	switch {
+	case bytes >= gi:
+		return fmt.Sprintf("%.1fGi", float64(bytes)/float64(gi))
+	case bytes >= mi:
+		return fmt.Sprintf("%.0fMi", float64(bytes)/float64(mi))
+	default:
+		return fmt.Sprintf("%dB", bytes)
+	}
 }
 
 func (r *EtcdBackupReconciler) setFailed(ctx context.Context, backup *popv1alpha1.EtcdBackup, message string) (ctrl.Result, error) {

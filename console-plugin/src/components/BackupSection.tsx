@@ -44,6 +44,14 @@ const BackupSection: React.FC<BackupSectionProps> = ({
   const scheduleConfig = config?.spec?.backup?.schedule;
   const backupStatus = config?.status?.backup;
 
+  const latestCompleted = [...(backups || [])]
+    .filter((b) => b.status?.phase === 'Completed' && b.status?.pvcUsagePercent != null)
+    .sort((a, b) => {
+      const aTime = new Date(a.metadata?.creationTimestamp || 0).getTime();
+      const bTime = new Date(b.metadata?.creationTimestamp || 0).getTime();
+      return bTime - aTime;
+    })[0];
+
   const sortedBackups = [...(backups || [])]
     .sort((a, b) => {
       const aTime = new Date(a.metadata?.creationTimestamp || 0).getTime();
@@ -116,6 +124,17 @@ const BackupSection: React.FC<BackupSectionProps> = ({
                   {backupStatus?.totalBackups ?? 0} / {backupStatus?.failedBackups ?? 0}
                 </DescriptionListDescription>
               </DescriptionListGroup>
+              <DescriptionListGroup>
+                <DescriptionListTerm>PVC usage</DescriptionListTerm>
+                <DescriptionListDescription>
+                  {latestCompleted?.status?.pvcUsagePercent != null
+                    ? `${latestCompleted.status.pvcUsagePercent}%`
+                    : 'N/A'}
+                  {latestCompleted?.status?.backupSize
+                    ? ` (last backup: ${latestCompleted.status.backupSize})`
+                    : ''}
+                </DescriptionListDescription>
+              </DescriptionListGroup>
             </DescriptionList>
           </GridItem>
         </Grid>
@@ -139,6 +158,8 @@ const BackupSection: React.FC<BackupSectionProps> = ({
                 <Th>Name</Th>
                 <Th>Phase</Th>
                 <Th>Node</Th>
+                <Th>Size</Th>
+                <Th>PVC %</Th>
                 <Th>Age</Th>
               </Tr>
             </Thead>
@@ -150,6 +171,12 @@ const BackupSection: React.FC<BackupSectionProps> = ({
                     <PhaseLabel phase={backup.status?.phase} />
                   </Td>
                   <Td dataLabel="Node">{backup.status?.backupNode || '-'}</Td>
+                  <Td dataLabel="Size">{backup.status?.backupSize || '-'}</Td>
+                  <Td dataLabel="PVC %">
+                    {backup.status?.pvcUsagePercent != null
+                      ? `${backup.status.pvcUsagePercent}%`
+                      : '-'}
+                  </Td>
                   <Td dataLabel="Age">
                     {formatTimestamp(backup.metadata?.creationTimestamp)}
                   </Td>

@@ -109,6 +109,7 @@ export interface EtcdBackupResource extends K8sResourceCommon {
     pvcName?: string;
     controlPlaneNode?: string;
     backupTimeoutMinutes?: number;
+    retentionCount?: number;
   };
   status?: {
     phase?: string;
@@ -117,6 +118,11 @@ export interface EtcdBackupResource extends K8sResourceCommon {
     startTime?: string;
     completionTime?: string;
     message?: string;
+    backupSizeBytes?: number;
+    backupSize?: string;
+    pvcUsedBytes?: number;
+    pvcCapacityBytes?: number;
+    pvcUsagePercent?: number;
   };
 }
 

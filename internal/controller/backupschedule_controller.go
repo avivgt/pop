@@ -131,6 +131,7 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				PVCName:              schedule.Spec.PVCName,
 				BackupTimeoutMinutes: schedule.Spec.BackupTimeoutMinutes,
 				ExportTarget:         schedule.Spec.ExportTarget,
+				RetentionCount:       schedule.Spec.RetentionCount,
 			},
 		}
 		if err := ctrl.SetControllerReference(schedule, etcdBackup, r.Scheme); err != nil {
@@ -182,6 +183,7 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				PVCName:              schedule.Spec.PVCName,
 				BackupTimeoutMinutes: schedule.Spec.BackupTimeoutMinutes,
 				ExportTarget:         schedule.Spec.ExportTarget,
+				RetentionCount:       schedule.Spec.RetentionCount,
 			},
 		}
 

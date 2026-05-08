@@ -17,7 +17,9 @@ import PhaseLabel from './shared/PhaseLabel';
 interface EtcdBackupResource extends K8sResourceCommon {
   status?: {
     phase?: string;
-    node?: string;
+    backupNode?: string;
+    backupSize?: string;
+    pvcUsagePercent?: number;
   };
 }
 
@@ -77,6 +79,8 @@ const EtcdBackupList: React.FC = () => {
                 <Th>Name</Th>
                 <Th>Phase</Th>
                 <Th>Node</Th>
+                <Th>Size</Th>
+                <Th>PVC %</Th>
                 <Th>Age</Th>
               </Tr>
             </Thead>
@@ -87,7 +91,13 @@ const EtcdBackupList: React.FC = () => {
                   <Td dataLabel="Phase">
                     <PhaseLabel phase={backup.status?.phase} />
                   </Td>
-                  <Td dataLabel="Node">{backup.status?.node || '-'}</Td>
+                  <Td dataLabel="Node">{backup.status?.backupNode || '-'}</Td>
+                  <Td dataLabel="Size">{backup.status?.backupSize || '-'}</Td>
+                  <Td dataLabel="PVC %">
+                    {backup.status?.pvcUsagePercent != null
+                      ? `${backup.status.pvcUsagePercent}%`
+                      : '-'}
+                  </Td>
                   <Td dataLabel="Age">
                     {formatTimestamp(backup.metadata?.creationTimestamp)}
                   </Td>

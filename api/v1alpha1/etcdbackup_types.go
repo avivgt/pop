@@ -54,6 +54,13 @@ type EtcdBackupSpec struct {
 	// Defaults to PVC export using PVCName.
 	// +optional
 	ExportTarget *ExportTarget `json:"exportTarget,omitempty"`
+
+	// RetentionCount is the max number of backups to keep on the PVC.
+	// Older backups are deleted before the new backup runs.
+	// +kubebuilder:default=5
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	RetentionCount int32 `json:"retentionCount,omitempty"`
 }
 
 // EtcdBackupStatus defines the observed state of EtcdBackup.
@@ -89,6 +96,21 @@ type EtcdBackupStatus struct {
 	// Message provides detail about the current phase.
 	Message string `json:"message,omitempty"`
 
+	// BackupSizeBytes is the size of this backup's artifacts in bytes.
+	BackupSizeBytes int64 `json:"backupSizeBytes,omitempty"`
+
+	// BackupSize is the human-readable backup size (e.g., "1.5Gi").
+	BackupSize string `json:"backupSize,omitempty"`
+
+	// PVCUsedBytes is the PVC usage in bytes after this backup completed.
+	PVCUsedBytes int64 `json:"pvcUsedBytes,omitempty"`
+
+	// PVCCapacityBytes is the total PVC capacity in bytes.
+	PVCCapacityBytes int64 `json:"pvcCapacityBytes,omitempty"`
+
+	// PVCUsagePercent is the PVC usage percentage after this backup.
+	PVCUsagePercent int32 `json:"pvcUsagePercent,omitempty"`
+
 	// Conditions represent the latest available observations.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
@@ -97,6 +119,8 @@ type EtcdBackupStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="Node",type=string,JSONPath=`.status.backupNode`
+// +kubebuilder:printcolumn:name="Size",type=string,JSONPath=`.status.backupSize`
+// +kubebuilder:printcolumn:name="PVC%",type=integer,JSONPath=`.status.pvcUsagePercent`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // EtcdBackup triggers a one-shot etcd backup on a control plane node
