@@ -255,8 +255,8 @@ func (r *ClusterShutdownReconciler) reconcileValidating(ctx context.Context, shu
 func (r *ClusterShutdownReconciler) reconcileCordoning(ctx context.Context, shutdown *popv1alpha1.ClusterShutdown) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	if !shutdown.Spec.CordonNodes {
-		logger.Info("node cordoning disabled, skipping")
+	if !shutdown.Spec.CordonNodes || shutdown.Spec.DryRun {
+		logger.Info("node cordoning skipped", "cordonNodes", shutdown.Spec.CordonNodes, "dryRun", shutdown.Spec.DryRun)
 		shutdown.Status.Phase = popv1alpha1.ClusterShutdownPhaseRunningHooks
 		shutdown.Status.Message = "Cordoning skipped, running pre-shutdown hooks"
 		if err := r.Status().Update(ctx, shutdown); err != nil {
