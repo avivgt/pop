@@ -27,6 +27,9 @@ spec:
     - jsonPath: .status.pvcUsagePercent
       name: PVC%
       type: integer
+    - jsonPath: .status.estimatedCapacity
+      name: Fits
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -209,6 +212,11 @@ spec:
                   - type
                   type: object
                 type: array
+              estimatedCapacity:
+                description: EstimatedCapacity is how many backups of this size the
+                  PVC can hold at 80% utilization.
+                format: int32
+                type: integer
               jobName:
                 description: JobName is the name of the backup Job created by this
                   resource.
@@ -239,6 +247,10 @@ spec:
                   completed.
                 format: int64
                 type: integer
+              recommendedPVCSize:
+                description: RecommendedPVCSize is the PVC size needed to hold retentionCount
+                  backups of this size.
+                type: string
               s3URI:
                 description: S3URI is the S3 object URI if exported to S3.
                 type: string

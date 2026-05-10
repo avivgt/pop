@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Alert,
   Card,
   CardTitle,
   CardBody,
@@ -133,11 +134,29 @@ const BackupSection: React.FC<BackupSectionProps> = ({
                   {latestCompleted?.status?.backupSize
                     ? ` (last backup: ${latestCompleted.status.backupSize})`
                     : ''}
+                  {latestCompleted?.status?.estimatedCapacity != null
+                    ? ` | fits ${latestCompleted.status.estimatedCapacity} backups`
+                    : ''}
                 </DescriptionListDescription>
               </DescriptionListGroup>
             </DescriptionList>
           </GridItem>
         </Grid>
+
+        {latestCompleted?.status?.estimatedCapacity != null &&
+          latestCompleted?.status?.recommendedPVCSize &&
+          latestCompleted.status.estimatedCapacity < (config?.spec?.backup?.schedule?.enabled !== false ? 5 : 5) && (
+          <Alert
+            variant="warning"
+            isInline
+            title="PVC resize recommended"
+            style={{ marginTop: 16 }}
+          >
+            PVC can only hold {latestCompleted.status.estimatedCapacity} backups at{' '}
+            {latestCompleted.status.backupSize} each. Resize PVC to{' '}
+            {latestCompleted.status.recommendedPVCSize} for full retention.
+          </Alert>
+        )}
 
         <Title headingLevel="h3" style={{ marginTop: 24, marginBottom: 8 }}>
           Recent backups
@@ -160,6 +179,7 @@ const BackupSection: React.FC<BackupSectionProps> = ({
                 <Th>Node</Th>
                 <Th>Size</Th>
                 <Th>PVC %</Th>
+                <Th>Fits</Th>
                 <Th>Age</Th>
               </Tr>
             </Thead>
@@ -175,6 +195,11 @@ const BackupSection: React.FC<BackupSectionProps> = ({
                   <Td dataLabel="PVC %">
                     {backup.status?.pvcUsagePercent != null
                       ? `${backup.status.pvcUsagePercent}%`
+                      : '-'}
+                  </Td>
+                  <Td dataLabel="Fits">
+                    {backup.status?.estimatedCapacity != null
+                      ? backup.status.estimatedCapacity
                       : '-'}
                   </Td>
                   <Td dataLabel="Age">

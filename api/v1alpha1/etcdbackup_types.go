@@ -111,6 +111,12 @@ type EtcdBackupStatus struct {
 	// PVCUsagePercent is the PVC usage percentage after this backup.
 	PVCUsagePercent int32 `json:"pvcUsagePercent,omitempty"`
 
+	// EstimatedCapacity is how many backups of this size the PVC can hold at 80% utilization.
+	EstimatedCapacity int32 `json:"estimatedCapacity,omitempty"`
+
+	// RecommendedPVCSize is the PVC size needed to hold retentionCount backups of this size.
+	RecommendedPVCSize string `json:"recommendedPVCSize,omitempty"`
+
 	// Conditions represent the latest available observations.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
@@ -121,6 +127,7 @@ type EtcdBackupStatus struct {
 // +kubebuilder:printcolumn:name="Node",type=string,JSONPath=`.status.backupNode`
 // +kubebuilder:printcolumn:name="Size",type=string,JSONPath=`.status.backupSize`
 // +kubebuilder:printcolumn:name="PVC%",type=integer,JSONPath=`.status.pvcUsagePercent`
+// +kubebuilder:printcolumn:name="Fits",type=integer,JSONPath=`.status.estimatedCapacity`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // EtcdBackup triggers a one-shot etcd backup on a control plane node

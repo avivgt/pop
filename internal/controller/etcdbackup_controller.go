@@ -257,27 +257,33 @@ func (r *EtcdBackupReconciler) buildBackupJob(backup *popv1alpha1.EtcdBackup, jo
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_DIR="/backup/${TIMESTAMP}"
 
-echo "Enforcing PVC retention before backup (keeping last ${MAX_BACKUPS} backups)..."
+PVC_CAPACITY=$(df -B1 /backup | tail -1 | awk '{print $2}')
+USABLE=$((PVC_CAPACITY * 80 / 100))
 BACKUP_COUNT=$(ls -1d /backup/2* 2>/dev/null | wc -l)
-if [ "${BACKUP_COUNT}" -ge "${MAX_BACKUPS}" ]; then
-  REMOVE_COUNT=$((BACKUP_COUNT - MAX_BACKUPS + 1))
+
+EFFECTIVE_MAX=${MAX_BACKUPS}
+if [ "${BACKUP_COUNT}" -gt 0 ]; then
+  TOTAL_USED=$(du -sb /backup/2* 2>/dev/null | awk '{s+=$1} END {print s+0}')
+  AVG_SIZE=$((TOTAL_USED / BACKUP_COUNT))
+  if [ "${AVG_SIZE}" -gt 0 ]; then
+    FITS=$((USABLE / AVG_SIZE))
+    [ "${FITS}" -lt 1 ] && FITS=1
+    if [ "${FITS}" -lt "${MAX_BACKUPS}" ]; then
+      EFFECTIVE_MAX=${FITS}
+      echo "PVC can fit ${FITS} backups at $(du -sh /backup/2* | tail -1 | awk '{print $1}') avg (requested ${MAX_BACKUPS})"
+    fi
+  fi
+fi
+
+KEEP=$((EFFECTIVE_MAX - 1))
+[ "${KEEP}" -lt 0 ] && KEEP=0
+if [ "${BACKUP_COUNT}" -gt "${KEEP}" ]; then
+  REMOVE_COUNT=$((BACKUP_COUNT - KEEP))
   ls -1d /backup/2* | sort | head -n "${REMOVE_COUNT}" | while read OLD_DIR; do
     echo "Removing old backup: ${OLD_DIR}"
     rm -rf "${OLD_DIR}"
   done
 fi
-
-PVC_USE_PCT=$(df /backup | tail -1 | awk '{gsub(/%/,""); print $5}')
-while [ "${PVC_USE_PCT}" -ge 80 ]; do
-  OLDEST=$(ls -1d /backup/2* 2>/dev/null | sort | head -n1)
-  if [ -z "${OLDEST}" ]; then
-    echo "WARNING: PVC at ${PVC_USE_PCT}% but no old backups to remove"
-    break
-  fi
-  echo "PVC at ${PVC_USE_PCT}%, removing ${OLDEST} to free space"
-  rm -rf "${OLDEST}"
-  PVC_USE_PCT=$(df /backup | tail -1 | awk '{gsub(/%/,""); print $5}')
-done
 
 echo "PVC usage before backup:"
 df -h /backup
@@ -307,7 +313,7 @@ fi
 BACKUP_SIZE=$(du -sb "${BACKUP_DIR}" | cut -f1)
 PVC_USED=$(df -B1 /backup | tail -1 | awk '{print $3}')
 PVC_CAPACITY=$(df -B1 /backup | tail -1 | awk '{print $2}')
-echo "BACKUP_META:${BACKUP_SIZE}:${PVC_USED}:${PVC_CAPACITY}"
+echo "BACKUP_META:${BACKUP_SIZE}:${PVC_USED}:${PVC_CAPACITY}:${EFFECTIVE_MAX}"
 
 echo "Backup completed successfully to ${BACKUP_DIR}"
 `
@@ -467,7 +473,7 @@ func (r *EtcdBackupReconciler) parseBackupMetadata(ctx context.Context, backup *
 				continue
 			}
 			parts := strings.Split(strings.TrimPrefix(line, "BACKUP_META:"), ":")
-			if len(parts) != 3 {
+			if len(parts) < 3 {
 				continue
 			}
 			backupSize, _ := strconv.ParseInt(parts[0], 10, 64)
@@ -481,9 +487,42 @@ func (r *EtcdBackupReconciler) parseBackupMetadata(ctx context.Context, backup *
 			if pvcCapacity > 0 {
 				backup.Status.PVCUsagePercent = int32(pvcUsed * 100 / pvcCapacity)
 			}
+
+			retentionCount := backup.Spec.RetentionCount
+			if retentionCount <= 0 {
+				retentionCount = 5
+			}
+			if backupSize > 0 && pvcCapacity > 0 {
+				usable := pvcCapacity * 80 / 100
+				estimated := int32(usable / backupSize)
+				if estimated < 1 {
+					estimated = 1
+				}
+				backup.Status.EstimatedCapacity = estimated
+				needed := int64(retentionCount) * backupSize * 100 / 80
+				backup.Status.RecommendedPVCSize = formatBytes(needed)
+
+				if estimated >= retentionCount {
+					meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
+						Type:    "PVCCapacity",
+						Status:  metav1.ConditionTrue,
+						Reason:  "Sufficient",
+						Message: fmt.Sprintf("PVC can hold %d backups at %s each (retention: %d)", estimated, backup.Status.BackupSize, retentionCount),
+					})
+				} else {
+					meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
+						Type:    "PVCCapacity",
+						Status:  metav1.ConditionFalse,
+						Reason:  "InsufficientCapacity",
+						Message: fmt.Sprintf("PVC fits %d backups but retention requests %d. Recommend resizing PVC to %s", estimated, retentionCount, backup.Status.RecommendedPVCSize),
+					})
+				}
+			}
+
 			logger.Info("parsed backup metadata",
 				"backupSize", backup.Status.BackupSize,
-				"pvcUsage", fmt.Sprintf("%d%%", backup.Status.PVCUsagePercent))
+				"pvcUsage", fmt.Sprintf("%d%%", backup.Status.PVCUsagePercent),
+				"estimatedCapacity", backup.Status.EstimatedCapacity)
 			return
 		}
 	}

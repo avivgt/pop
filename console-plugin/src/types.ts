@@ -123,6 +123,8 @@ export interface EtcdBackupResource extends K8sResourceCommon {
     pvcUsedBytes?: number;
     pvcCapacityBytes?: number;
     pvcUsagePercent?: number;
+    estimatedCapacity?: number;
+    recommendedPVCSize?: string;
   };
 }
 

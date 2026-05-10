@@ -20,6 +20,7 @@ interface EtcdBackupResource extends K8sResourceCommon {
     backupNode?: string;
     backupSize?: string;
     pvcUsagePercent?: number;
+    estimatedCapacity?: number;
   };
 }
 
@@ -81,6 +82,7 @@ const EtcdBackupList: React.FC = () => {
                 <Th>Node</Th>
                 <Th>Size</Th>
                 <Th>PVC %</Th>
+                <Th>Fits</Th>
                 <Th>Age</Th>
               </Tr>
             </Thead>
@@ -96,6 +98,11 @@ const EtcdBackupList: React.FC = () => {
                   <Td dataLabel="PVC %">
                     {backup.status?.pvcUsagePercent != null
                       ? `${backup.status.pvcUsagePercent}%`
+                      : '-'}
+                  </Td>
+                  <Td dataLabel="Fits">
+                    {backup.status?.estimatedCapacity != null
+                      ? backup.status.estimatedCapacity
                       : '-'}
                   </Td>
                   <Td dataLabel="Age">
