@@ -266,6 +266,19 @@ if [ "${BACKUP_COUNT}" -ge "${MAX_BACKUPS}" ]; then
     rm -rf "${OLD_DIR}"
   done
 fi
+
+PVC_USE_PCT=$(df /backup | tail -1 | awk '{gsub(/%/,""); print $5}')
+while [ "${PVC_USE_PCT}" -ge 80 ]; do
+  OLDEST=$(ls -1d /backup/2* 2>/dev/null | sort | head -n1)
+  if [ -z "${OLDEST}" ]; then
+    echo "WARNING: PVC at ${PVC_USE_PCT}% but no old backups to remove"
+    break
+  fi
+  echo "PVC at ${PVC_USE_PCT}%, removing ${OLDEST} to free space"
+  rm -rf "${OLDEST}"
+  PVC_USE_PCT=$(df /backup | tail -1 | awk '{gsub(/%/,""); print $5}')
+done
+
 echo "PVC usage before backup:"
 df -h /backup
 
@@ -310,8 +323,9 @@ echo "Backup completed successfully to ${BACKUP_DIR}"
 			},
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit:          &backoffLimit,
-			ActiveDeadlineSeconds: &timeout,
+			BackoffLimit:            &backoffLimit,
+			ActiveDeadlineSeconds:   &timeout,
+			TTLSecondsAfterFinished: ptr(int32(3600)),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -508,6 +522,8 @@ func (r *EtcdBackupReconciler) setFailed(ctx context.Context, backup *popv1alpha
 	}
 	return ctrl.Result{}, nil
 }
+
+func ptr[T any](v T) *T { return &v }
 
 func (r *EtcdBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
