@@ -585,7 +585,11 @@ func (r *ClusterShutdownReconciler) reconcileBackingUp(ctx context.Context, shut
 			now := metav1.Now()
 			shutdown.Status.Phase = popv1alpha1.ClusterShutdownPhaseComplete
 			shutdown.Status.CompletionTime = &now
-			shutdown.Status.Message = "Dry run complete — backup successful, no nodes were shut down"
+			shutdown.Status.Message = "Dry run complete -- backup successful, no nodes were shut down"
+			for i := range shutdown.Status.NodeStatuses {
+				shutdown.Status.NodeStatuses[i].Status = "Skipped"
+				shutdown.Status.NodeStatuses[i].Message = "dry run -- node not affected"
+			}
 			meta.SetStatusCondition(&shutdown.Status.Conditions, metav1.Condition{
 				Type:    "Ready",
 				Status:  metav1.ConditionTrue,
