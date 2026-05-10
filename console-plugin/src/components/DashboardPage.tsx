@@ -12,19 +12,17 @@ import {
   ClusterLifecycleConfigModel,
   EtcdBackupModel,
   ClusterShutdownModel,
-  ClusterRestartModel,
   PowerEventModel,
 } from '../models';
 import {
   ClusterLifecycleConfigResource,
   EtcdBackupResource,
   ClusterShutdownResource,
-  ClusterRestartResource,
   PowerEventResource,
 } from '../types';
 import StatusBar from './StatusBar';
 import BackupSection from './BackupSection';
-import OperationsSection from './OperationsSection';
+import ShutdownSection from './ShutdownSection';
 import PowerSection from './PowerSection';
 import SettingsSection from './SettingsSection';
 
@@ -73,20 +71,6 @@ const DashboardPage: React.FC = () => {
     namespaced: true,
   });
 
-  // Watch ClusterRestarts
-  const [clusterRestarts, restartsLoaded, restartsError] = useK8sWatchResource<
-    ClusterRestartResource[]
-  >({
-    groupVersionKind: {
-      group: ClusterRestartModel.apiGroup,
-      version: ClusterRestartModel.apiVersion,
-      kind: ClusterRestartModel.kind,
-    },
-    namespace: NAMESPACE,
-    isList: true,
-    namespaced: true,
-  });
-
   // Watch PowerEvents
   const [powerEvents, powerEventsLoaded, powerEventsError] = useK8sWatchResource<
     PowerEventResource[]
@@ -107,7 +91,7 @@ const DashboardPage: React.FC = () => {
     (configList || [])[0];
 
   const isLoading = !configLoaded;
-  const hasError = configError || etcdBackupsError || shutdownsError || restartsError || powerEventsError;
+  const hasError = configError || etcdBackupsError || shutdownsError || powerEventsError;
 
   if (isLoading) {
     return (
@@ -137,7 +121,6 @@ const DashboardPage: React.FC = () => {
             {configError && <p>Config: {String(configError)}</p>}
             {etcdBackupsError && <p>Backups: {String(etcdBackupsError)}</p>}
             {shutdownsError && <p>Shutdowns: {String(shutdownsError)}</p>}
-            {restartsError && <p>Restarts: {String(restartsError)}</p>}
             {powerEventsError && <p>Power Events: {String(powerEventsError)}</p>}
           </Alert>
         </PageSection>
@@ -157,12 +140,10 @@ const DashboardPage: React.FC = () => {
       </PageSection>
 
       <PageSection>
-        <OperationsSection
+        <ShutdownSection
           config={config}
           shutdowns={clusterShutdowns || []}
-          restarts={clusterRestarts || []}
           shutdownsLoaded={shutdownsLoaded}
-          restartsLoaded={restartsLoaded}
           namespace={NAMESPACE}
         />
       </PageSection>

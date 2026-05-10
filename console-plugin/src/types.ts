@@ -130,6 +130,19 @@ export interface EtcdBackupResource extends K8sResourceCommon {
 
 // --- ClusterShutdown ---
 
+export interface NodeShutdownStatus {
+  name: string;
+  role: string;
+  status: string;
+  message?: string;
+}
+
+export interface HookStatus {
+  name: string;
+  phase: string;
+  message?: string;
+}
+
 export interface ClusterShutdownResource extends K8sResourceCommon {
   spec?: {
     pvcName?: string;
@@ -141,8 +154,15 @@ export interface ClusterShutdownResource extends K8sResourceCommon {
     phase?: string;
     totalNodes?: number;
     shutdownNodes?: number;
+    cordonedNodes?: number;
     certificateExpiry?: string;
     message?: string;
+    etcdBackupRef?: string;
+    startTime?: string;
+    completionTime?: string;
+    estimatedCompletionTime?: string;
+    nodeStatuses?: NodeShutdownStatus[];
+    hookStatuses?: HookStatus[];
   };
 }
 

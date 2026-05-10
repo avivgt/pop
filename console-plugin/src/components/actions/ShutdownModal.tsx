@@ -4,10 +4,10 @@ import {
   ModalVariant,
   Button,
   TextInput,
-  Checkbox,
   Alert,
   Form,
   FormGroup,
+  Title,
 } from '@patternfly/react-core';
 import { k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
 import { ClusterShutdownModel } from '../../models';
@@ -26,13 +26,12 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
   namespace,
 }) => {
   const [reason, setReason] = React.useState('');
-  const [dryRun, setDryRun] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | undefined>(undefined);
 
-  const handleConfirm = () => {
+  const handleSubmit = (dryRun: boolean) => {
     if (!reason.trim()) {
-      setError('A reason is required for cluster shutdown.');
+      setError('A reason is required.');
       return;
     }
 
@@ -60,7 +59,6 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
       .then(() => {
         setIsSubmitting(false);
         setReason('');
-        setDryRun(true);
         onClose();
       })
       .catch((err: Error) => {
@@ -73,25 +71,33 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
     setError(undefined);
     setIsSubmitting(false);
     setReason('');
-    setDryRun(true);
     onClose();
   };
 
   return (
     <Modal
       variant={ModalVariant.small}
-      title="Shutdown Cluster"
+      title="Cluster Shutdown"
       isOpen={isOpen}
       onClose={handleClose}
       actions={[
         <Button
-          key="confirm"
-          variant="danger"
-          onClick={handleConfirm}
+          key="test"
+          variant="primary"
+          onClick={() => handleSubmit(true)}
           isLoading={isSubmitting}
           isDisabled={isSubmitting || !reason.trim()}
         >
-          {dryRun ? 'Shutdown (Dry Run)' : 'Shutdown Cluster'}
+          Test Shutdown
+        </Button>,
+        <Button
+          key="shutdown"
+          variant="danger"
+          onClick={() => handleSubmit(false)}
+          isLoading={isSubmitting}
+          isDisabled={isSubmitting || !reason.trim()}
+        >
+          Shutdown Cluster
         </Button>,
         <Button key="cancel" variant="link" onClick={handleClose} isDisabled={isSubmitting}>
           Cancel
@@ -99,16 +105,6 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
       ]}
     >
       <Form>
-        {!dryRun && (
-          <Alert
-            variant="danger"
-            isInline
-            title="This will shut down the cluster!"
-            style={{ marginBottom: 16 }}
-          >
-            All nodes will be powered off. Ensure you have a valid reason and a plan to restart.
-          </Alert>
-        )}
         <FormGroup label="Reason" isRequired fieldId="shutdown-reason">
           <TextInput
             id="shutdown-reason"
@@ -118,14 +114,22 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
             isRequired
           />
         </FormGroup>
-        <FormGroup fieldId="shutdown-dryrun">
-          <Checkbox
-            id="shutdown-dryrun"
-            label="Dry run (validate and backup only, do not shut down nodes)"
-            isChecked={dryRun}
-            onChange={(_event, checked) => setDryRun(checked)}
-          />
-        </FormGroup>
+        <Title headingLevel="h4" style={{ marginTop: 16 }}>
+          Options
+        </Title>
+        <Alert
+          variant="info"
+          isInline
+          isPlain
+          title="Test Shutdown runs the full procedure (validate, cordon, hooks, backup) without powering down nodes."
+        />
+        <Alert
+          variant="warning"
+          isInline
+          isPlain
+          title="Shutdown Cluster will power off all nodes. Ensure you have a plan to restart."
+          style={{ marginTop: 8 }}
+        />
       </Form>
       {error && (
         <Alert variant="danger" isInline title="Error" style={{ marginTop: 16 }}>
