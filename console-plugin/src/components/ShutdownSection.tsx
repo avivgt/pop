@@ -54,7 +54,8 @@ const ShutdownSection: React.FC<ShutdownSectionProps> = ({
   shutdownsLoaded,
   namespace,
 }) => {
-  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [isTestModalOpen, setIsTestModalOpen] = React.useState(false);
+  const [isShutdownModalOpen, setIsShutdownModalOpen] = React.useState(false);
   const [nodesExpanded, setNodesExpanded] = React.useState(false);
 
   const pvcName = config?.spec?.backup?.storage?.pvcName || 'etcd-backup-pvc';
@@ -86,12 +87,12 @@ const ShutdownSection: React.FC<ShutdownSectionProps> = ({
       <CardBody>
         <Split hasGutter style={{ marginBottom: 16 }}>
           <SplitItem>
-            <Button variant="primary" onClick={() => setIsModalOpen(true)}>
+            <Button variant="primary" onClick={() => setIsTestModalOpen(true)}>
               Test Shutdown
             </Button>
           </SplitItem>
           <SplitItem>
-            <Button variant="danger" onClick={() => setIsModalOpen(true)}>
+            <Button variant="danger" onClick={() => setIsShutdownModalOpen(true)}>
               Shutdown Cluster
             </Button>
           </SplitItem>
@@ -254,10 +255,18 @@ const ShutdownSection: React.FC<ShutdownSectionProps> = ({
       </CardBody>
 
       <ShutdownModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isTestModalOpen}
+        onClose={() => setIsTestModalOpen(false)}
         pvcName={pvcName}
         namespace={namespace}
+        mode="test"
+      />
+      <ShutdownModal
+        isOpen={isShutdownModalOpen}
+        onClose={() => setIsShutdownModalOpen(false)}
+        pvcName={pvcName}
+        namespace={namespace}
+        mode="shutdown"
       />
     </Card>
   );

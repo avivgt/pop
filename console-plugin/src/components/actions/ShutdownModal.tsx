@@ -7,7 +7,6 @@ import {
   Alert,
   Form,
   FormGroup,
-  Title,
 } from '@patternfly/react-core';
 import { k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
 import { ClusterShutdownModel } from '../../models';
@@ -17,6 +16,7 @@ interface ShutdownModalProps {
   onClose: () => void;
   pvcName: string;
   namespace: string;
+  mode: 'test' | 'shutdown';
 }
 
 const ShutdownModal: React.FC<ShutdownModalProps> = ({
@@ -24,12 +24,15 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
   onClose,
   pvcName,
   namespace,
+  mode,
 }) => {
   const [reason, setReason] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | undefined>(undefined);
 
-  const handleSubmit = (dryRun: boolean) => {
+  const isTest = mode === 'test';
+
+  const handleSubmit = () => {
     if (!reason.trim()) {
       setError('A reason is required.');
       return;
@@ -51,7 +54,7 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
         },
         spec: {
           pvcName,
-          dryRun,
+          dryRun: isTest,
           reason: reason.trim(),
         },
       },
@@ -77,27 +80,18 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
   return (
     <Modal
       variant={ModalVariant.small}
-      title="Cluster Shutdown"
+      title={isTest ? 'Test Shutdown' : 'Shutdown Cluster'}
       isOpen={isOpen}
       onClose={handleClose}
       actions={[
         <Button
-          key="test"
-          variant="primary"
-          onClick={() => handleSubmit(true)}
+          key="confirm"
+          variant={isTest ? 'primary' : 'danger'}
+          onClick={handleSubmit}
           isLoading={isSubmitting}
           isDisabled={isSubmitting || !reason.trim()}
         >
-          Test Shutdown
-        </Button>,
-        <Button
-          key="shutdown"
-          variant="danger"
-          onClick={() => handleSubmit(false)}
-          isLoading={isSubmitting}
-          isDisabled={isSubmitting || !reason.trim()}
-        >
-          Shutdown Cluster
+          {isTest ? 'Run Test' : 'Shutdown Cluster'}
         </Button>,
         <Button key="cancel" variant="link" onClick={handleClose} isDisabled={isSubmitting}>
           Cancel
@@ -105,31 +99,32 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
       ]}
     >
       <Form>
-        <FormGroup label="Reason" isRequired fieldId="shutdown-reason">
+        {isTest ? (
+          <Alert
+            variant="info"
+            isInline
+            isPlain
+            title="Runs the full shutdown procedure (validate, hooks, backup) without cordoning nodes or powering down."
+          />
+        ) : (
+          <Alert
+            variant="danger"
+            isInline
+            title="This will shut down the entire cluster"
+            style={{ marginBottom: 16 }}
+          >
+            All nodes will be cordoned and powered off. This action cannot be undone from the console.
+          </Alert>
+        )}
+        <FormGroup label="Reason" isRequired fieldId="shutdown-reason" style={{ marginTop: 16 }}>
           <TextInput
             id="shutdown-reason"
             value={reason}
             onChange={(_event, value) => setReason(value)}
-            placeholder="e.g. Scheduled maintenance window"
+            placeholder={isTest ? 'e.g. Pre-maintenance validation' : 'e.g. Scheduled maintenance window'}
             isRequired
           />
         </FormGroup>
-        <Title headingLevel="h4" style={{ marginTop: 16 }}>
-          Options
-        </Title>
-        <Alert
-          variant="info"
-          isInline
-          isPlain
-          title="Test Shutdown runs the full procedure (validate, cordon, hooks, backup) without powering down nodes."
-        />
-        <Alert
-          variant="warning"
-          isInline
-          isPlain
-          title="Shutdown Cluster will power off all nodes. Ensure you have a plan to restart."
-          style={{ marginTop: 8 }}
-        />
       </Form>
       {error && (
         <Alert variant="danger" isInline title="Error" style={{ marginTop: 16 }}>
