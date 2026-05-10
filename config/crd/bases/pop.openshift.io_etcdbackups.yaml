@@ -212,6 +212,10 @@ spec:
                   - type
                   type: object
                 type: array
+              defragSaved:
+                description: DefragSaved is the human-readable space saved by pre-backup
+                  etcd defragmentation.
+                type: string
               estimatedCapacity:
                 description: EstimatedCapacity is how many backups of this size the
                   PVC can hold at 80% utilization.
@@ -257,6 +261,10 @@ spec:
               snapshotFile:
                 description: SnapshotFile is the name of the etcd snapshot file.
                 type: string
+              snapshotVerified:
+                description: SnapshotVerified indicates whether the backup snapshot
+                  passed integrity verification.
+                type: boolean
               startTime:
                 description: StartTime is when the backup started.
                 format: date-time

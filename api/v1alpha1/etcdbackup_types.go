@@ -117,6 +117,12 @@ type EtcdBackupStatus struct {
 	// RecommendedPVCSize is the PVC size needed to hold retentionCount backups of this size.
 	RecommendedPVCSize string `json:"recommendedPVCSize,omitempty"`
 
+	// DefragSaved is the human-readable space saved by pre-backup etcd defragmentation.
+	DefragSaved string `json:"defragSaved,omitempty"`
+
+	// SnapshotVerified indicates whether the backup snapshot passed integrity verification.
+	SnapshotVerified bool `json:"snapshotVerified,omitempty"`
+
 	// Conditions represent the latest available observations.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

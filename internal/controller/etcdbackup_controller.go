@@ -288,10 +288,35 @@ fi
 echo "PVC usage before backup:"
 df -h /backup
 
+ETCDCTL_CID=$(chroot /host crictl ps --name "^etcdctl$" -q 2>/dev/null | head -1)
+
+DB_BEFORE=0
+DB_AFTER=0
+if [ -n "${ETCDCTL_CID}" ]; then
+  echo "Defragmenting etcd..."
+  DB_BEFORE=$(chroot /host crictl exec "${ETCDCTL_CID}" etcdctl endpoint status --write-out=json 2>/dev/null | grep -o '"dbSize":[0-9]*' | head -1 | cut -d: -f2) || DB_BEFORE=0
+  chroot /host crictl exec "${ETCDCTL_CID}" etcdctl defrag 2>&1 || echo "WARNING: etcd defrag failed, continuing with backup"
+  DB_AFTER=$(chroot /host crictl exec "${ETCDCTL_CID}" etcdctl endpoint status --write-out=json 2>/dev/null | grep -o '"dbSize":[0-9]*' | head -1 | cut -d: -f2) || DB_AFTER=0
+  echo "etcd DB size: ${DB_BEFORE} -> ${DB_AFTER} bytes"
+else
+  echo "WARNING: etcdctl container not found, skipping defrag"
+fi
+
 mkdir -p "${BACKUP_DIR}"
 
-echo "Starting etcd backup on $(hostname) at ${TIMESTAMP}"
-chroot /host /usr/local/bin/cluster-backup.sh /home/core/assets/backup
+echo "Starting etcd backup at ${TIMESTAMP}"
+BACKUP_OUTPUT=$(chroot /host /usr/local/bin/cluster-backup.sh /home/core/assets/backup 2>&1)
+echo "${BACKUP_OUTPUT}"
+
+VERIFIED=0
+if echo "${BACKUP_OUTPUT}" | grep -q '"hash":[0-9]'; then
+  VERIFIED=1
+  SNAPSHOT_HASH=$(echo "${BACKUP_OUTPUT}" | grep -o '"hash":[0-9]*' | cut -d: -f2)
+  echo "Snapshot verification passed (hash: ${SNAPSHOT_HASH})"
+else
+  echo "ERROR: Snapshot verification failed -- no hash in backup output"
+  exit 1
+fi
 
 echo "Copying backup artifacts to PVC..."
 cp /host/home/core/assets/backup/snapshot_*.db "${BACKUP_DIR}/" 2>/dev/null || true
@@ -313,7 +338,7 @@ fi
 BACKUP_SIZE=$(du -sb "${BACKUP_DIR}" | cut -f1)
 PVC_USED=$(df -B1 /backup | tail -1 | awk '{print $3}')
 PVC_CAPACITY=$(df -B1 /backup | tail -1 | awk '{print $2}')
-echo "BACKUP_META:${BACKUP_SIZE}:${PVC_USED}:${PVC_CAPACITY}:${EFFECTIVE_MAX}"
+echo "BACKUP_META:${BACKUP_SIZE}:${PVC_USED}:${PVC_CAPACITY}:${EFFECTIVE_MAX}:${DB_BEFORE}:${DB_AFTER}:${VERIFIED}"
 
 echo "Backup completed successfully to ${BACKUP_DIR}"
 `
@@ -519,10 +544,55 @@ func (r *EtcdBackupReconciler) parseBackupMetadata(ctx context.Context, backup *
 				}
 			}
 
+			if len(parts) >= 7 {
+				dbBefore, _ := strconv.ParseInt(parts[4], 10, 64)
+				dbAfter, _ := strconv.ParseInt(parts[5], 10, 64)
+				verified := parts[6] == "1"
+
+				backup.Status.SnapshotVerified = verified
+				if dbBefore > 0 && dbAfter > 0 {
+					saved := dbBefore - dbAfter
+					if saved > 0 {
+						backup.Status.DefragSaved = formatBytes(saved)
+					}
+					meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
+						Type:    "EtcdDefragged",
+						Status:  metav1.ConditionTrue,
+						Reason:  "DefragCompleted",
+						Message: fmt.Sprintf("etcd defragmented: %s -> %s (saved %s)", formatBytes(dbBefore), formatBytes(dbAfter), backup.Status.DefragSaved),
+					})
+				} else {
+					meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
+						Type:    "EtcdDefragged",
+						Status:  metav1.ConditionTrue,
+						Reason:  "DefragSkipped",
+						Message: "etcd defrag skipped or container not found",
+					})
+				}
+
+				if verified {
+					meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
+						Type:    "SnapshotIntegrity",
+						Status:  metav1.ConditionTrue,
+						Reason:  "Verified",
+						Message: "snapshot passed etcdutl integrity check",
+					})
+				} else {
+					meta.SetStatusCondition(&backup.Status.Conditions, metav1.Condition{
+						Type:    "SnapshotIntegrity",
+						Status:  metav1.ConditionFalse,
+						Reason:  "NotVerified",
+						Message: "snapshot integrity could not be verified",
+					})
+				}
+			}
+
 			logger.Info("parsed backup metadata",
 				"backupSize", backup.Status.BackupSize,
 				"pvcUsage", fmt.Sprintf("%d%%", backup.Status.PVCUsagePercent),
-				"estimatedCapacity", backup.Status.EstimatedCapacity)
+				"estimatedCapacity", backup.Status.EstimatedCapacity,
+				"defragSaved", backup.Status.DefragSaved,
+				"snapshotVerified", backup.Status.SnapshotVerified)
 			return
 		}
 	}
