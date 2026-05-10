@@ -49,7 +49,7 @@ type ClusterShutdownReconciler struct {
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;delete
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;create;update
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create
 
@@ -183,12 +183,12 @@ func (r *ClusterShutdownReconciler) reconcileValidating(ctx context.Context, shu
 		return ctrl.Result{}, err
 	}
 
-	if len(nodeList.Items) == 0 {
-		return r.setFailed(ctx, shutdown, "no nodes found in the cluster")
-	}
-
 	var nodeStatuses []popv1alpha1.NodeShutdownState
 	for _, node := range nodeList.Items {
+		if !isNodeReady(&node) {
+			logger.Info("skipping NotReady node", "node", node.Name)
+			continue
+		}
 		role := "worker"
 		if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
 			role = "control-plane"
@@ -200,6 +200,10 @@ func (r *ClusterShutdownReconciler) reconcileValidating(ctx context.Context, shu
 			Role:   role,
 			Status: "Pending",
 		})
+	}
+
+	if len(nodeStatuses) == 0 {
+		return r.setFailed(ctx, shutdown, "no ready nodes found in the cluster")
 	}
 
 	shutdown.Status.NodeStatuses = nodeStatuses
