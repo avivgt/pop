@@ -31,15 +31,62 @@ import { formatTimestamp } from '../utils';
 import PhaseLabel from './shared/PhaseLabel';
 import ShutdownModal from './actions/ShutdownModal';
 
-const SHUTDOWN_PHASES = [
-  { key: 'Validating', label: 'Validate' },
-  { key: 'Cordoning', label: 'Cordon' },
-  { key: 'RunningHooks', label: 'Hooks' },
-  { key: 'NotifyingApps', label: 'Notify' },
-  { key: 'BackingUp', label: 'Backup' },
-  { key: 'ShuttingDown', label: 'Shutdown' },
-  { key: 'Complete', label: 'Done' },
+const SHUTDOWN_STEPS = [
+  {
+    key: 'Validating',
+    label: 'Validate',
+    description: 'Check certificate expiry, preflight checks, enumerate Ready nodes',
+  },
+  {
+    key: 'Cordoning',
+    label: 'Cordon Nodes',
+    description: 'Mark all nodes as unschedulable to prevent new pod scheduling',
+  },
+  {
+    key: 'RunningHooks',
+    label: 'Pre-shutdown Hooks',
+    description: 'Run user-defined jobs (flush databases, deregister from load balancers)',
+  },
+  {
+    key: 'NotifyingApps',
+    label: 'Notify Applications',
+    description: 'Create shutdown signal ConfigMap so applications can react',
+  },
+  {
+    key: 'BackingUp',
+    label: 'Backup etcd',
+    description: 'Defragment etcd, take snapshot, verify integrity, export to PVC',
+  },
+  {
+    key: 'ShuttingDown',
+    label: 'Shut Down Nodes',
+    description: 'Send shutdown command to each node (workers first, then control plane)',
+  },
+  {
+    key: 'Complete',
+    label: 'Complete',
+    description: 'All steps finished successfully',
+  },
 ];
+
+function getStepStatus(
+  stepIndex: number,
+  currentIndex: number,
+  phase: string | undefined,
+  isDryRun: boolean,
+): 'done' | 'active' | 'pending' | 'failed' | 'skipped' {
+  if (phase === 'Complete' || phase === 'Failed') {
+    if (phase === 'Failed' && stepIndex === currentIndex) return 'failed';
+    if (stepIndex <= currentIndex) return phase === 'Complete' ? 'done' : 'done';
+    return 'pending';
+  }
+  if (isDryRun && (SHUTDOWN_STEPS[stepIndex].key === 'Cordoning' || SHUTDOWN_STEPS[stepIndex].key === 'ShuttingDown')) {
+    if (stepIndex < currentIndex) return 'skipped';
+  }
+  if (stepIndex < currentIndex) return 'done';
+  if (stepIndex === currentIndex) return 'active';
+  return 'pending';
+}
 
 interface ShutdownSectionProps {
   config: ClusterLifecycleConfigResource | undefined;
@@ -67,6 +114,15 @@ const ShutdownSection: React.FC<ShutdownSectionProps> = ({
       s.status.phase !== 'Failed',
   );
 
+  const latestShutdown = activeShutdown || [...(shutdowns || [])]
+    .sort((a, b) => {
+      const aTime = new Date(a.metadata?.creationTimestamp || 0).getTime();
+      const bTime = new Date(b.metadata?.creationTimestamp || 0).getTime();
+      return bTime - aTime;
+    })[0];
+
+  const showProgress = latestShutdown?.status?.phase != null;
+
   const sortedShutdowns = [...(shutdowns || [])]
     .sort((a, b) => {
       const aTime = new Date(a.metadata?.creationTimestamp || 0).getTime();
@@ -75,9 +131,14 @@ const ShutdownSection: React.FC<ShutdownSectionProps> = ({
     })
     .slice(0, 10);
 
-  const currentPhaseIndex = activeShutdown
-    ? SHUTDOWN_PHASES.findIndex((p) => p.key === activeShutdown.status?.phase)
+  const currentPhaseIndex = latestShutdown
+    ? SHUTDOWN_STEPS.findIndex((p) => p.key === latestShutdown.status?.phase)
     : -1;
+
+  const isDryRun = latestShutdown?.spec?.dryRun === true;
+  const isActive = activeShutdown != null;
+  const isComplete = latestShutdown?.status?.phase === 'Complete';
+  const isFailed = latestShutdown?.status?.phase === 'Failed';
 
   return (
     <Card>
@@ -98,87 +159,143 @@ const ShutdownSection: React.FC<ShutdownSectionProps> = ({
           </SplitItem>
         </Split>
 
-        {activeShutdown && (
-          <Card isFlat style={{ marginBottom: 16, backgroundColor: '#f0f0f0' }}>
+        {showProgress && (
+          <Card isFlat style={{ marginBottom: 16 }}>
             <CardBody>
-              <Title headingLevel="h3" style={{ marginBottom: 12 }}>
-                {activeShutdown.spec?.dryRun ? 'Test Run' : 'Shutdown'} in
-                progress: {activeShutdown.metadata?.name}
-              </Title>
+              <Split style={{ marginBottom: 12 }}>
+                <SplitItem isFilled>
+                  <Title headingLevel="h3">
+                    {isDryRun ? 'Test Run' : 'Shutdown'}
+                    {isActive ? ' in progress' : isComplete ? ' completed' : ' failed'}
+                    {': '}{latestShutdown.metadata?.name}
+                  </Title>
+                </SplitItem>
+                {latestShutdown.status?.startTime && (
+                  <SplitItem>
+                    <span style={{ color: '#6a6e73', fontSize: '0.875rem' }}>
+                      Started {formatTimestamp(latestShutdown.status.startTime)}
+                    </span>
+                  </SplitItem>
+                )}
+              </Split>
 
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 4,
-                  marginBottom: 16,
-                  flexWrap: 'wrap',
-                }}
-              >
-                {SHUTDOWN_PHASES.map((phase, idx) => {
-                  let icon = <PendingIcon />;
-                  let color: 'grey' | 'blue' | 'green' | 'red' = 'grey';
+              <div style={{ marginBottom: 16 }}>
+                {SHUTDOWN_STEPS.map((step, idx) => {
+                  const status = getStepStatus(idx, currentPhaseIndex, latestShutdown.status?.phase, isDryRun);
 
-                  if (activeShutdown.status?.phase === 'Failed') {
-                    if (idx < currentPhaseIndex) {
-                      icon = <CheckCircleIcon />;
+                  let icon: React.ReactNode;
+                  let color: 'grey' | 'blue' | 'green' | 'red' | 'orange';
+                  let textStyle: React.CSSProperties = {};
+
+                  switch (status) {
+                    case 'done':
+                      icon = <CheckCircleIcon color="#3e8635" />;
                       color = 'green';
-                    } else if (idx === currentPhaseIndex) {
-                      icon = <ExclamationCircleIcon />;
+                      break;
+                    case 'active':
+                      icon = <InProgressIcon color="#0066cc" />;
+                      color = 'blue';
+                      break;
+                    case 'failed':
+                      icon = <ExclamationCircleIcon color="#c9190b" />;
                       color = 'red';
-                    }
-                  } else if (idx < currentPhaseIndex) {
-                    icon = <CheckCircleIcon />;
-                    color = 'green';
-                  } else if (idx === currentPhaseIndex) {
-                    icon = <InProgressIcon />;
-                    color = 'blue';
+                      break;
+                    case 'skipped':
+                      icon = <CheckCircleIcon color="#6a6e73" />;
+                      color = 'grey';
+                      textStyle = { textDecoration: 'line-through', opacity: 0.6 };
+                      break;
+                    default:
+                      icon = <PendingIcon color="#6a6e73" />;
+                      color = 'grey';
+                      break;
                   }
 
                   return (
-                    <Label key={phase.key} color={color} icon={icon}>
-                      {phase.label}
-                    </Label>
+                    <div
+                      key={step.key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 12,
+                        padding: '8px 0',
+                        borderBottom: idx < SHUTDOWN_STEPS.length - 1 ? '1px solid #d2d2d2' : 'none',
+                      }}
+                    >
+                      <div style={{ paddingTop: 2, flexShrink: 0 }}>{icon}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: status === 'active' ? 600 : 400, ...textStyle }}>
+                          {step.label}
+                          {status === 'skipped' && ' (skipped in test)'}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#6a6e73', ...textStyle }}>
+                          {step.description}
+                        </div>
+                        {status === 'active' && latestShutdown.status?.message && (
+                          <div style={{ fontSize: '0.85rem', color: '#0066cc', marginTop: 4 }}>
+                            {latestShutdown.status.message}
+                          </div>
+                        )}
+                        {status === 'failed' && latestShutdown.status?.message && (
+                          <div style={{ fontSize: '0.85rem', color: '#c9190b', marginTop: 4 }}>
+                            {latestShutdown.status.message}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ flexShrink: 0 }}>
+                        <Label color={color} variant="outline" isCompact>
+                          {status === 'done' ? 'Done' : status === 'active' ? 'Running' : status === 'failed' ? 'Failed' : status === 'skipped' ? 'Skipped' : 'Pending'}
+                        </Label>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
 
-              <DescriptionList isCompact isHorizontal>
-                <DescriptionListGroup>
-                  <DescriptionListTerm>Status</DescriptionListTerm>
-                  <DescriptionListDescription>
-                    {activeShutdown.status?.message || activeShutdown.status?.phase}
-                  </DescriptionListDescription>
-                </DescriptionListGroup>
-                {activeShutdown.status?.totalNodes != null && (
+              {latestShutdown.status?.totalNodes != null && (
+                <DescriptionList isCompact isHorizontal style={{ marginBottom: 12 }}>
                   <DescriptionListGroup>
                     <DescriptionListTerm>Nodes</DescriptionListTerm>
                     <DescriptionListDescription>
-                      Cordoned: {activeShutdown.status?.cordonedNodes ?? 0}/
-                      {activeShutdown.status.totalNodes} | Shut down:{' '}
-                      {activeShutdown.status?.shutdownNodes ?? 0}/
-                      {activeShutdown.status.totalNodes}
+                      {latestShutdown.status.totalNodes} total
+                      {(latestShutdown.status?.cordonedNodes ?? 0) > 0 &&
+                        ` | ${latestShutdown.status.cordonedNodes} cordoned`}
+                      {(latestShutdown.status?.shutdownNodes ?? 0) > 0 &&
+                        ` | ${latestShutdown.status.shutdownNodes} shut down`}
                     </DescriptionListDescription>
                   </DescriptionListGroup>
-                )}
-                {activeShutdown.status?.etcdBackupRef && (
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>Backup</DescriptionListTerm>
-                    <DescriptionListDescription>
-                      {activeShutdown.status.etcdBackupRef}
-                    </DescriptionListDescription>
-                  </DescriptionListGroup>
-                )}
-              </DescriptionList>
+                  {latestShutdown.status?.etcdBackupRef && (
+                    <DescriptionListGroup>
+                      <DescriptionListTerm>Backup</DescriptionListTerm>
+                      <DescriptionListDescription>
+                        {latestShutdown.status.etcdBackupRef}
+                      </DescriptionListDescription>
+                    </DescriptionListGroup>
+                  )}
+                  {latestShutdown.status?.completionTime && (
+                    <DescriptionListGroup>
+                      <DescriptionListTerm>Duration</DescriptionListTerm>
+                      <DescriptionListDescription>
+                        {(() => {
+                          const start = new Date(latestShutdown.status?.startTime || 0).getTime();
+                          const end = new Date(latestShutdown.status.completionTime).getTime();
+                          const secs = Math.round((end - start) / 1000);
+                          return secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
+                        })()}
+                      </DescriptionListDescription>
+                    </DescriptionListGroup>
+                  )}
+                </DescriptionList>
+              )}
 
-              {activeShutdown.status?.nodeStatuses &&
-                activeShutdown.status.nodeStatuses.length > 0 && (
+              {latestShutdown.status?.nodeStatuses &&
+                latestShutdown.status.nodeStatuses.length > 0 && (
                   <ExpandableSection
                     toggleText={
                       nodesExpanded ? 'Hide node details' : 'Show node details'
                     }
                     isExpanded={nodesExpanded}
                     onToggle={(_event, expanded) => setNodesExpanded(expanded)}
-                    style={{ marginTop: 12 }}
                   >
                     <Table aria-label="Node shutdown status" variant="compact">
                       <Thead>
@@ -190,7 +307,7 @@ const ShutdownSection: React.FC<ShutdownSectionProps> = ({
                         </Tr>
                       </Thead>
                       <Tbody>
-                        {activeShutdown.status.nodeStatuses.map((ns) => (
+                        {latestShutdown.status.nodeStatuses.map((ns) => (
                           <Tr key={ns.name}>
                             <Td dataLabel="Node">{ns.name}</Td>
                             <Td dataLabel="Role">{ns.role}</Td>
