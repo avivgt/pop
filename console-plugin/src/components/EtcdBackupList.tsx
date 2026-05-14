@@ -6,23 +6,17 @@ import {
   EmptyStateBody,
   Spinner,
   Bullseye,
+  Breadcrumb,
+  BreadcrumbItem,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
-import { K8sResourceCommon } from '@openshift-console/dynamic-plugin-sdk';
 import { EtcdBackupModel } from '../models';
+import { EtcdBackupResource } from '../types';
 import { formatTimestamp } from '../utils';
 import PhaseLabel from './shared/PhaseLabel';
 
-interface EtcdBackupResource extends K8sResourceCommon {
-  status?: {
-    phase?: string;
-    backupNode?: string;
-    backupSize?: string;
-    pvcUsagePercent?: number;
-    estimatedCapacity?: number;
-  };
-}
+const NAMESPACE = 'pop-system';
 
 const EtcdBackupList: React.FC = () => {
   const [etcdBackups, loaded, error] = useK8sWatchResource<EtcdBackupResource[]>({
@@ -31,6 +25,7 @@ const EtcdBackupList: React.FC = () => {
       version: EtcdBackupModel.apiVersion,
       kind: EtcdBackupModel.kind,
     },
+    namespace: NAMESPACE,
     isList: true,
     namespaced: true,
   });
@@ -66,7 +61,12 @@ const EtcdBackupList: React.FC = () => {
   return (
     <>
       <PageSection variant="light">
-        <Title headingLevel="h1">EtcdBackups</Title>
+        <Breadcrumb>
+          <BreadcrumbItem to="/backup-and-restore">Dashboard</BreadcrumbItem>
+          <BreadcrumbItem to="/backup-and-restore/backup">etcd Backup</BreadcrumbItem>
+          <BreadcrumbItem isActive>All Backups</BreadcrumbItem>
+        </Breadcrumb>
+        <Title headingLevel="h1" style={{ marginTop: 8 }}>All Backups</Title>
       </PageSection>
       <PageSection>
         {sortedBackups.length === 0 ? (

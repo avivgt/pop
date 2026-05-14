@@ -28,8 +28,64 @@
       "id": "pop-dashboard",
       "perspective": "admin",
       "section": "backup-and-restore",
-      "name": "POP Dashboard",
+      "name": "Dashboard",
       "href": "/backup-and-restore"
+    },
+    "flags": {
+      "required": ["POP_ENABLED"]
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "pop-backup",
+      "perspective": "admin",
+      "section": "backup-and-restore",
+      "name": "etcd Backup",
+      "href": "/backup-and-restore/backup",
+      "insertAfter": "pop-dashboard"
+    },
+    "flags": {
+      "required": ["POP_ENABLED"]
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "pop-shutdown",
+      "perspective": "admin",
+      "section": "backup-and-restore",
+      "name": "Cluster Shutdown",
+      "href": "/backup-and-restore/shutdown",
+      "insertAfter": "pop-backup"
+    },
+    "flags": {
+      "required": ["POP_ENABLED"]
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "pop-power",
+      "perspective": "admin",
+      "section": "backup-and-restore",
+      "name": "Power Protection",
+      "href": "/backup-and-restore/power",
+      "insertAfter": "pop-shutdown"
+    },
+    "flags": {
+      "required": ["POP_ENABLED"]
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "pop-settings",
+      "perspective": "admin",
+      "section": "backup-and-restore",
+      "name": "Settings",
+      "href": "/backup-and-restore/settings",
+      "insertAfter": "pop-power"
     },
     "flags": {
       "required": ["POP_ENABLED"]
@@ -39,9 +95,122 @@
     "type": "console.page/route",
     "properties": {
       "path": "/backup-and-restore",
+      "exact": true,
       "perspective": "admin",
       "component": {
         "$codeRef": "DashboardPage"
+      }
+    },
+    "flags": {
+      "required": ["POP_ENABLED"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/backup-and-restore/backup",
+      "exact": true,
+      "perspective": "admin",
+      "component": {
+        "$codeRef": "BackupPage"
+      }
+    },
+    "flags": {
+      "required": ["POP_ENABLED"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/backup-and-restore/shutdown",
+      "exact": true,
+      "perspective": "admin",
+      "component": {
+        "$codeRef": "ShutdownPage"
+      }
+    },
+    "flags": {
+      "required": ["POP_ENABLED"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/backup-and-restore/power",
+      "exact": true,
+      "perspective": "admin",
+      "component": {
+        "$codeRef": "PowerPage"
+      }
+    },
+    "flags": {
+      "required": ["POP_ENABLED"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/backup-and-restore/settings",
+      "exact": true,
+      "perspective": "admin",
+      "component": {
+        "$codeRef": "SettingsPage"
+      }
+    },
+    "flags": {
+      "required": ["POP_ENABLED"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/backup-and-restore/backups",
+      "exact": true,
+      "perspective": "admin",
+      "component": {
+        "$codeRef": "EtcdBackupList"
+      }
+    },
+    "flags": {
+      "required": ["POP_ENABLED"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/backup-and-restore/shutdowns",
+      "exact": true,
+      "perspective": "admin",
+      "component": {
+        "$codeRef": "ClusterShutdownList"
+      }
+    },
+    "flags": {
+      "required": ["POP_ENABLED"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/backup-and-restore/restarts",
+      "exact": true,
+      "perspective": "admin",
+      "component": {
+        "$codeRef": "ClusterRestartList"
+      }
+    },
+    "flags": {
+      "required": ["POP_ENABLED"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/backup-and-restore/schedules",
+      "exact": true,
+      "perspective": "admin",
+      "component": {
+        "$codeRef": "BackupScheduleList"
       }
     },
     "flags": {

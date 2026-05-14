@@ -138,7 +138,6 @@ const ShutdownSection: React.FC<ShutdownSectionProps> = ({
   const isDryRun = latestShutdown?.spec?.dryRun === true;
   const isActive = activeShutdown != null;
   const isComplete = latestShutdown?.status?.phase === 'Complete';
-  const isFailed = latestShutdown?.status?.phase === 'Failed';
 
   return (
     <Card>

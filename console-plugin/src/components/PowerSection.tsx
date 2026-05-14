@@ -112,6 +112,14 @@ const PowerSection: React.FC<PowerSectionProps> = ({
         </Flex>
       </CardTitle>
       <CardBody>
+        <div style={{ marginBottom: 16, color: '#6a6e73', fontSize: '0.9rem', lineHeight: 1.6 }}>
+          Automated emergency response for power outages. When a UPS or PDU sends a power failure
+          alert to the webhook endpoint, the system immediately backs up etcd, waits for a
+          confirmation period (in case power returns), then gracefully shuts down the cluster
+          based on priority. If power is restored at any point before shutdown, the process cancels
+          and the backup is preserved.
+        </div>
+
         <Flex spaceItems={{ default: 'spaceItemsLg' }} style={{ marginBottom: 16 }}>
           <FlexItem>
             <DescriptionList isCompact isHorizontal>

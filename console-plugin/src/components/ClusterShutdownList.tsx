@@ -6,24 +6,17 @@ import {
   EmptyStateBody,
   Spinner,
   Bullseye,
+  Breadcrumb,
+  BreadcrumbItem,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
-import { K8sResourceCommon } from '@openshift-console/dynamic-plugin-sdk';
 import { ClusterShutdownModel } from '../models';
+import { ClusterShutdownResource } from '../types';
 import { formatTimestamp } from '../utils';
 import PhaseLabel from './shared/PhaseLabel';
 
-interface ClusterShutdownResource extends K8sResourceCommon {
-  spec?: {
-    dryRun?: boolean;
-  };
-  status?: {
-    phase?: string;
-    shutdownNodes?: number;
-    totalNodes?: number;
-  };
-}
+const NAMESPACE = 'pop-system';
 
 const ClusterShutdownList: React.FC = () => {
   const [clusterShutdowns, loaded, error] = useK8sWatchResource<ClusterShutdownResource[]>({
@@ -32,6 +25,7 @@ const ClusterShutdownList: React.FC = () => {
       version: ClusterShutdownModel.apiVersion,
       kind: ClusterShutdownModel.kind,
     },
+    namespace: NAMESPACE,
     isList: true,
     namespaced: true,
   });
@@ -67,7 +61,12 @@ const ClusterShutdownList: React.FC = () => {
   return (
     <>
       <PageSection variant="light">
-        <Title headingLevel="h1">ClusterShutdowns</Title>
+        <Breadcrumb>
+          <BreadcrumbItem to="/backup-and-restore">Dashboard</BreadcrumbItem>
+          <BreadcrumbItem to="/backup-and-restore/shutdown">Cluster Shutdown</BreadcrumbItem>
+          <BreadcrumbItem isActive>All Shutdowns</BreadcrumbItem>
+        </Breadcrumb>
+        <Title headingLevel="h1" style={{ marginTop: 8 }}>All Shutdowns</Title>
       </PageSection>
       <PageSection>
         {sortedShutdowns.length === 0 ? (

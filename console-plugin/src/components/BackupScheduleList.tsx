@@ -6,6 +6,8 @@ import {
   EmptyStateBody,
   Spinner,
   Bullseye,
+  Breadcrumb,
+  BreadcrumbItem,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
@@ -25,6 +27,8 @@ interface BackupScheduleResource extends K8sResourceCommon {
   };
 }
 
+const NAMESPACE = 'pop-system';
+
 const BackupScheduleList: React.FC = () => {
   const [backupSchedules, loaded, error] = useK8sWatchResource<BackupScheduleResource[]>({
     groupVersionKind: {
@@ -32,6 +36,7 @@ const BackupScheduleList: React.FC = () => {
       version: BackupScheduleModel.apiVersion,
       kind: BackupScheduleModel.kind,
     },
+    namespace: NAMESPACE,
     isList: true,
     namespaced: true,
   });
@@ -67,7 +72,12 @@ const BackupScheduleList: React.FC = () => {
   return (
     <>
       <PageSection variant="light">
-        <Title headingLevel="h1">BackupSchedules</Title>
+        <Breadcrumb>
+          <BreadcrumbItem to="/backup-and-restore">Dashboard</BreadcrumbItem>
+          <BreadcrumbItem to="/backup-and-restore/backup">etcd Backup</BreadcrumbItem>
+          <BreadcrumbItem isActive>Schedules</BreadcrumbItem>
+        </Breadcrumb>
+        <Title headingLevel="h1" style={{ marginTop: 8 }}>Backup Schedules</Title>
       </PageSection>
       <PageSection>
         {sortedSchedules.length === 0 ? (

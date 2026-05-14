@@ -26,7 +26,7 @@ interface SettingsSectionProps {
   namespace: string;
 }
 
-const SettingsSection: React.FC<SettingsSectionProps> = ({ config, namespace }) => {
+const SettingsSection: React.FC<SettingsSectionProps> = ({ config, namespace: _namespace }) => {
   const spec = config?.spec;
 
   // Storage

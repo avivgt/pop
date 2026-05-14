@@ -6,22 +6,17 @@ import {
   EmptyStateBody,
   Spinner,
   Bullseye,
+  Breadcrumb,
+  BreadcrumbItem,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
-import { K8sResourceCommon } from '@openshift-console/dynamic-plugin-sdk';
 import { ClusterRestartModel } from '../models';
+import { ClusterRestartResource } from '../types';
 import { formatTimestamp } from '../utils';
 import PhaseLabel from './shared/PhaseLabel';
 
-interface ClusterRestartResource extends K8sResourceCommon {
-  status?: {
-    phase?: string;
-    readyNodes?: number;
-    totalNodes?: number;
-    approvedCSRs?: number;
-  };
-}
+const NAMESPACE = 'pop-system';
 
 const ClusterRestartList: React.FC = () => {
   const [clusterRestarts, loaded, error] = useK8sWatchResource<ClusterRestartResource[]>({
@@ -30,6 +25,7 @@ const ClusterRestartList: React.FC = () => {
       version: ClusterRestartModel.apiVersion,
       kind: ClusterRestartModel.kind,
     },
+    namespace: NAMESPACE,
     isList: true,
     namespaced: true,
   });
@@ -65,7 +61,11 @@ const ClusterRestartList: React.FC = () => {
   return (
     <>
       <PageSection variant="light">
-        <Title headingLevel="h1">ClusterRestarts</Title>
+        <Breadcrumb>
+          <BreadcrumbItem to="/backup-and-restore">Dashboard</BreadcrumbItem>
+          <BreadcrumbItem isActive>All Restarts</BreadcrumbItem>
+        </Breadcrumb>
+        <Title headingLevel="h1" style={{ marginTop: 8 }}>All Restarts</Title>
       </PageSection>
       <PageSection>
         {sortedRestarts.length === 0 ? (
