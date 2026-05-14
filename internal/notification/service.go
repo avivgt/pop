@@ -171,7 +171,7 @@ func (s *Service) sendWebhook(ctx context.Context, webhookConfig *popv1alpha1.We
 		s.logger.Error(err, "Webhook request failed", "url", webhookConfig.URL)
 		return record
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		record.Success = true
@@ -370,7 +370,7 @@ func (s *Service) sendAlertmanager(ctx context.Context, amConfig *popv1alpha1.Al
 		s.logger.Error(err, "Alertmanager request failed", "url", url)
 		return record
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		record.Success = true

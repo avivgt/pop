@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -34,6 +35,12 @@ import (
 
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
 	popmetrics "github.com/avivgt/pop/internal/metrics"
+)
+
+const (
+	hookPhaseFailed  = "Failed"
+	hookPhaseRunning = "Running"
+	nodeShuttingDown = "ShuttingDown"
 )
 
 type ClusterShutdownReconciler struct {
@@ -183,7 +190,7 @@ func (r *ClusterShutdownReconciler) reconcileValidating(ctx context.Context, shu
 		return ctrl.Result{}, err
 	}
 
-	var nodeStatuses []popv1alpha1.NodeShutdownState
+	nodeStatuses := make([]popv1alpha1.NodeShutdownState, 0, len(nodeList.Items))
 	for _, node := range nodeList.Items {
 		if !isNodeReady(&node) {
 			logger.Info("skipping NotReady node", "node", node.Name)
@@ -191,9 +198,9 @@ func (r *ClusterShutdownReconciler) reconcileValidating(ctx context.Context, shu
 		}
 		role := "worker"
 		if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
-			role = "control-plane"
+			role = roleControlPlane
 		} else if _, ok := node.Labels["node-role.kubernetes.io/control-plane"]; ok {
-			role = "control-plane"
+			role = roleControlPlane
 		}
 		nodeStatuses = append(nodeStatuses, popv1alpha1.NodeShutdownState{
 			Name:   node.Name,
@@ -381,26 +388,26 @@ func (r *ClusterShutdownReconciler) reconcileRunningHooks(ctx context.Context, s
 			}
 			if err := r.Create(ctx, job); err != nil {
 				if apierrors.IsAlreadyExists(err) {
-					hs.Phase = "Running"
+					hs.Phase = hookPhaseRunning
 					hs.JobName = jobName
 					continue
 				}
 				logger.Error(err, "failed to create hook job", "hook", hook.Name)
-				hs.Phase = "Failed"
+				hs.Phase = hookPhaseFailed
 				hs.Message = fmt.Sprintf("failed to create job: %v", err)
 				continue
 			}
 
 			logger.Info("created hook job", "hook", hook.Name, "job", jobName)
-			hs.Phase = "Running"
+			hs.Phase = hookPhaseRunning
 			hs.JobName = jobName
 
-		case "Running":
+		case hookPhaseRunning:
 			allCompleted = false
 			job := &batchv1.Job{}
 			if err := r.Get(ctx, types.NamespacedName{Name: hs.JobName, Namespace: shutdown.Namespace}, job); err != nil {
 				if apierrors.IsNotFound(err) {
-					hs.Phase = "Failed"
+					hs.Phase = hookPhaseFailed
 					hs.Message = "hook job not found"
 				} else {
 					logger.Error(err, "failed to get hook job", "hook", hook.Name)
@@ -412,21 +419,21 @@ func (r *ClusterShutdownReconciler) reconcileRunningHooks(ctx context.Context, s
 				hs.Phase = "Completed"
 				hs.Message = "hook completed successfully"
 			} else if job.Status.Failed > 0 {
-				hs.Phase = "Failed"
+				hs.Phase = hookPhaseFailed
 				hs.Message = "hook job failed"
 			}
 
 		case "Completed":
 			// Already done.
 
-		case "Failed":
+		case hookPhaseFailed:
 			// Will be caught below.
 		}
 	}
 
 	// Check for any failures.
 	for _, hs := range shutdown.Status.HookStatuses {
-		if hs.Phase == "Failed" {
+		if hs.Phase == hookPhaseFailed {
 			if err := r.Status().Update(ctx, shutdown); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -637,19 +644,19 @@ func (r *ClusterShutdownReconciler) reconcileShuttingDown(ctx context.Context, s
 			shutdownCount++
 			continue
 		}
-		if ns.Status == "Failed" {
+		if ns.Status == hookPhaseFailed {
 			anyFailed = true
 			shutdownCount++
 			continue
 		}
 
-		if ns.Status == "ShuttingDown" {
+		if ns.Status == nodeShuttingDown {
 			allDone = false
 			pod := &corev1.Pod{}
 			err := r.Get(ctx, types.NamespacedName{Name: ns.ShutdownPodName, Namespace: shutdown.Namespace}, pod)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
-					ns.Status = "Failed"
+					ns.Status = hookPhaseFailed
 					ns.Message = "shutdown pod not found"
 					anyFailed = true
 					shutdownCount++
@@ -663,7 +670,7 @@ func (r *ClusterShutdownReconciler) reconcileShuttingDown(ctx context.Context, s
 				ns.Message = "shutdown command completed"
 				shutdownCount++
 			case corev1.PodFailed:
-				ns.Status = "Failed"
+				ns.Status = hookPhaseFailed
 				ns.Message = "shutdown pod failed"
 				anyFailed = true
 				shutdownCount++
@@ -671,10 +678,10 @@ func (r *ClusterShutdownReconciler) reconcileShuttingDown(ctx context.Context, s
 			continue
 		}
 
-		// Status == "Pending" — create the shutdown pod
+		// Status == "Pending" -- create the shutdown pod
 		allDone = false
 		delay := workerDelay
-		if ns.Role == "control-plane" {
+		if ns.Role == roleControlPlane {
 			delay = controlPlaneDelay
 		}
 
@@ -685,12 +692,12 @@ func (r *ClusterShutdownReconciler) reconcileShuttingDown(ctx context.Context, s
 		}
 		if err := r.Create(ctx, pod); err != nil {
 			if apierrors.IsAlreadyExists(err) {
-				ns.Status = "ShuttingDown"
+				ns.Status = nodeShuttingDown
 				ns.ShutdownPodName = pod.Name
 				continue
 			}
 			logger.Error(err, "failed to create shutdown pod", "node", ns.Name)
-			ns.Status = "Failed"
+			ns.Status = hookPhaseFailed
 			ns.Message = fmt.Sprintf("failed to create shutdown pod: %v", err)
 			anyFailed = true
 			shutdownCount++
@@ -698,7 +705,7 @@ func (r *ClusterShutdownReconciler) reconcileShuttingDown(ctx context.Context, s
 		}
 
 		logger.Info("created shutdown pod", "node", ns.Name, "pod", pod.Name, "delay", delay)
-		ns.Status = "ShuttingDown"
+		ns.Status = nodeShuttingDown
 		ns.ShutdownPodName = pod.Name
 	}
 
@@ -850,7 +857,7 @@ func (r *ClusterShutdownReconciler) checkCertExpiry(ctx context.Context) (*metav
 }
 
 func (r *ClusterShutdownReconciler) setFailed(ctx context.Context, shutdown *popv1alpha1.ClusterShutdown, message string) (ctrl.Result, error) {
-	log.FromContext(ctx).Error(fmt.Errorf(message), "shutdown failed")
+	log.FromContext(ctx).Error(errors.New(message), "shutdown failed")
 	popmetrics.ClusterShutdownTotal.WithLabelValues("failure", "false").Inc()
 	now := metav1.Now()
 	shutdown.Status.Phase = popv1alpha1.ClusterShutdownPhaseFailed

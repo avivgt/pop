@@ -19,6 +19,7 @@ package controller
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -463,7 +464,6 @@ func (r *EtcdBackupReconciler) listControlPlaneNodes(ctx context.Context) (ready
 	return ready, total, nil
 }
 
-
 func (r *EtcdBackupReconciler) parseBackupMetadata(ctx context.Context, backup *popv1alpha1.EtcdBackup) {
 	logger := log.FromContext(ctx)
 	if r.Clientset == nil {
@@ -489,7 +489,7 @@ func (r *EtcdBackupReconciler) parseBackupMetadata(ctx context.Context, backup *
 			logger.Error(err, "failed to read backup pod logs")
 			return
 		}
-		defer logStream.Close()
+		defer func() { _ = logStream.Close() }()
 
 		scanner := bufio.NewScanner(logStream)
 		for scanner.Scan() {
@@ -614,7 +614,7 @@ func formatBytes(bytes int64) string {
 }
 
 func (r *EtcdBackupReconciler) setFailed(ctx context.Context, backup *popv1alpha1.EtcdBackup, message string) (ctrl.Result, error) {
-	log.FromContext(ctx).Error(fmt.Errorf(message), "backup failed")
+	log.FromContext(ctx).Error(errors.New(message), "backup failed")
 	popmetrics.EtcdBackupTotal.WithLabelValues("failure").Inc()
 	now := metav1.Now()
 	backup.Status.Phase = popv1alpha1.EtcdBackupPhaseFailed

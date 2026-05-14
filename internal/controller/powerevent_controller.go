@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -548,7 +549,7 @@ func (r *PowerEventReconciler) setCancelled(ctx context.Context, event *popv1alp
 }
 
 func (r *PowerEventReconciler) setFailed(ctx context.Context, event *popv1alpha1.PowerEvent, message string) (ctrl.Result, error) {
-	log.FromContext(ctx).Error(fmt.Errorf(message), "power event failed")
+	log.FromContext(ctx).Error(errors.New(message), "power event failed")
 	event.Status.Phase = popv1alpha1.PowerEventPhaseFailed
 	event.Status.Message = message
 	meta.SetStatusCondition(&event.Status.Conditions, metav1.Condition{

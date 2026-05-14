@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -207,7 +208,7 @@ func (r *WorkloadEvacuationReconciler) namespacesInScope(ctx context.Context, ex
 		return nil, err
 	}
 
-	var namespaces []string
+	namespaces := make([]string, 0, len(nsList.Items))
 	for _, ns := range nsList.Items {
 		name := ns.Name
 		if name == "default" ||
@@ -223,7 +224,7 @@ func (r *WorkloadEvacuationReconciler) namespacesInScope(ctx context.Context, ex
 // buildDryRunWaveStatuses creates wave statuses for dry-run canary mode,
 // showing what each wave would migrate.
 func (r *WorkloadEvacuationReconciler) buildDryRunWaveStatuses(waves []popv1alpha1.EvacuationWave, totalWorkloads int32) []popv1alpha1.WaveStatus {
-	var statuses []popv1alpha1.WaveStatus
+	statuses := make([]popv1alpha1.WaveStatus, 0, len(waves))
 	for i, wave := range waves {
 		waveTotal := totalWorkloads * wave.Percent / 100
 		statuses = append(statuses, popv1alpha1.WaveStatus{
@@ -253,7 +254,7 @@ func (r *WorkloadEvacuationReconciler) buildWaveStatuses(evacuation *popv1alpha1
 		}
 	}
 
-	var statuses []popv1alpha1.WaveStatus
+	statuses := make([]popv1alpha1.WaveStatus, 0, len(evacuation.Spec.Waves))
 	for i, wave := range evacuation.Spec.Waves {
 		waveTotal := totalWorkloads * wave.Percent / 100
 		statuses = append(statuses, popv1alpha1.WaveStatus{
@@ -267,7 +268,7 @@ func (r *WorkloadEvacuationReconciler) buildWaveStatuses(evacuation *popv1alpha1
 }
 
 func (r *WorkloadEvacuationReconciler) setFailed(ctx context.Context, evacuation *popv1alpha1.WorkloadEvacuation, message string) (ctrl.Result, error) {
-	log.FromContext(ctx).Error(fmt.Errorf(message), "evacuation failed")
+	log.FromContext(ctx).Error(errors.New(message), "evacuation failed")
 	now := metav1.Now()
 	evacuation.Status.Phase = popv1alpha1.EvacuationPhaseFailed
 	evacuation.Status.Message = message

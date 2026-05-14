@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -34,6 +35,8 @@ import (
 
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
 )
+
+const roleControlPlane = "control-plane"
 
 // ClusterRestartReconciler reconciles a ClusterRestart object
 type ClusterRestartReconciler struct {
@@ -113,7 +116,7 @@ func (r *ClusterRestartReconciler) reconcileWaitingForControlPlane(ctx context.C
 		return ctrl.Result{}, err
 	}
 
-	var cpNodeStatuses []popv1alpha1.NodeRestartStatus
+	cpNodeStatuses := make([]popv1alpha1.NodeRestartStatus, 0, len(nodeList.Items))
 	allReady := true
 
 	for _, node := range nodeList.Items {
@@ -133,7 +136,7 @@ func (r *ClusterRestartReconciler) reconcileWaitingForControlPlane(ctx context.C
 
 		cpNodeStatuses = append(cpNodeStatuses, popv1alpha1.NodeRestartStatus{
 			Name:    node.Name,
-			Role:    "control-plane",
+			Role:    roleControlPlane,
 			Ready:   ready,
 			Message: msg,
 		})
@@ -228,16 +231,16 @@ func (r *ClusterRestartReconciler) reconcileWaitingForWorkers(ctx context.Contex
 		return ctrl.Result{}, err
 	}
 
-	var nodeStatuses []popv1alpha1.NodeRestartStatus
+	nodeStatuses := make([]popv1alpha1.NodeRestartStatus, 0, len(nodeList.Items))
 	var readyCount int32
 	totalCount := int32(len(nodeList.Items))
 
 	for _, node := range nodeList.Items {
 		role := "worker"
 		if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
-			role = "control-plane"
+			role = roleControlPlane
 		} else if _, ok := node.Labels["node-role.kubernetes.io/control-plane"]; ok {
-			role = "control-plane"
+			role = roleControlPlane
 		}
 
 		ready := isNodeReady(&node)
@@ -399,7 +402,7 @@ func (r *ClusterRestartReconciler) setComplete(ctx context.Context, restart *pop
 }
 
 func (r *ClusterRestartReconciler) setFailed(ctx context.Context, restart *popv1alpha1.ClusterRestart, message string) (ctrl.Result, error) {
-	log.FromContext(ctx).Error(fmt.Errorf(message), "restart failed")
+	log.FromContext(ctx).Error(errors.New(message), "restart failed")
 	now := metav1.Now()
 	restart.Status.Phase = popv1alpha1.ClusterRestartPhaseFailed
 	restart.Status.Message = message
