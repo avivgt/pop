@@ -33,25 +33,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
+	"github.com/avivgt/pop/internal/eventsource"
 	popmetrics "github.com/avivgt/pop/internal/metrics"
 )
 
-type PowerProtectionConfigReconciler struct {
+type AutomatedProceduresConfigReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme        *runtime.Scheme
+	SourceManager *eventsource.Manager
 }
 
-// +kubebuilder:rbac:groups=pop.openshift.io,resources=powerprotectionconfigs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=pop.openshift.io,resources=powerprotectionconfigs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=pop.openshift.io,resources=powerprotectionconfigs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=pop.openshift.io,resources=automatedproceduresconfigs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=pop.openshift.io,resources=automatedproceduresconfigs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=pop.openshift.io,resources=automatedproceduresconfigs/finalizers,verbs=update
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=powerevents,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch
 
-func (r *PowerProtectionConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *AutomatedProceduresConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	config := &popv1alpha1.PowerProtectionConfig{}
+	config := &popv1alpha1.AutomatedProceduresConfig{}
 	if err := r.Get(ctx, req.NamespacedName, config); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -63,7 +65,7 @@ func (r *PowerProtectionConfigReconciler) Reconcile(ctx context.Context, req ctr
 			Type:    "Ready",
 			Status:  metav1.ConditionFalse,
 			Reason:  "Disabled",
-			Message: "Power protection is disabled",
+			Message: "Automated procedures disabled",
 		})
 		if err := r.Status().Update(ctx, config); err != nil {
 			return ctrl.Result{}, err
@@ -146,11 +148,16 @@ func (r *PowerProtectionConfigReconciler) Reconcile(ctx context.Context, req ctr
 		popmetrics.PowerStatus.Set(0)
 	}
 
+	if r.SourceManager != nil {
+		r.SourceManager.Reconcile(config.Spec.EventSources)
+		config.Status.EventSources = r.SourceManager.Statuses()
+	}
+
 	meta.SetStatusCondition(&config.Status.Conditions, metav1.Condition{
 		Type:    "Ready",
 		Status:  metav1.ConditionTrue,
 		Reason:  "Validated",
-		Message: fmt.Sprintf("Power protection active, priority: %s, power: %s", config.Spec.ClusterPriority, powerStatus),
+		Message: fmt.Sprintf("Automated procedures active, priority: %s, power: %s", config.Spec.ClusterPriority, powerStatus),
 	})
 
 	if err := r.Status().Update(ctx, config); err != nil {
@@ -160,8 +167,8 @@ func (r *PowerProtectionConfigReconciler) Reconcile(ctx context.Context, req ctr
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 }
 
-func (r *PowerProtectionConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *AutomatedProceduresConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&popv1alpha1.PowerProtectionConfig{}).
+		For(&popv1alpha1.AutomatedProceduresConfig{}).
 		Complete(r)
 }

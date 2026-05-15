@@ -4,14 +4,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.1
-  name: powerprotectionconfigs.pop.openshift.io
+  name: automatedproceduresconfigs.pop.openshift.io
 spec:
   group: pop.openshift.io
   names:
-    kind: PowerProtectionConfig
-    listKind: PowerProtectionConfigList
-    plural: powerprotectionconfigs
-    singular: powerprotectionconfig
+    kind: AutomatedProceduresConfig
+    listKind: AutomatedProceduresConfigList
+    plural: automatedproceduresconfigs
+    singular: automatedproceduresconfig
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -33,8 +33,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: PowerProtectionConfig configures UPS/PSU-driven power protection
-          for the cluster.
+        description: AutomatedProceduresConfig defines automated event response for
+          the cluster.
         properties:
           apiVersion:
             description: |-
@@ -54,7 +54,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: PowerProtectionConfigSpec defines the desired state of PowerProtectionConfig.
+            description: AutomatedProceduresConfigSpec defines the desired state of
+              AutomatedProceduresConfig.
             properties:
               alertEndpoint:
                 description: AlertEndpoint configures the PSU alert webhook receiver.
@@ -79,8 +80,7 @@ spec:
                   after the confirmation period + priority delay without human intervention.
                 type: boolean
               backupConfig:
-                description: BackupConfig defines backup storage for emergency power-event
-                  backups.
+                description: BackupConfig defines backup storage for emergency backups.
                 properties:
                   exportTarget:
                     description: ExportTarget optionally configures S3 export for
@@ -154,8 +154,159 @@ spec:
                 type: string
               enabled:
                 default: false
-                description: Enabled is the master switch for power protection.
+                description: Enabled is the master switch for automated procedures.
                 type: boolean
+              eventSources:
+                description: EventSources configures how power and infrastructure
+                  events are detected.
+                properties:
+                  ipmi:
+                    description: IPMI configures IPMI/Redfish BMC power monitoring.
+                    properties:
+                      authSecret:
+                        description: AuthSecret is the name of a Secret with BMC credentials
+                          (username, password).
+                        type: string
+                      enabled:
+                        default: false
+                        description: Enabled activates IPMI/Redfish monitoring.
+                        type: boolean
+                      host:
+                        description: Host is the BMC address.
+                        type: string
+                      pollingIntervalSeconds:
+                        default: 30
+                        description: PollingIntervalSeconds is how often to poll the
+                          BMC.
+                        format: int32
+                        minimum: 5
+                        type: integer
+                      port:
+                        default: 443
+                        description: Port is the BMC port.
+                        format: int32
+                        type: integer
+                      protocol:
+                        default: redfish
+                        description: Protocol is "redfish" or "ipmi".
+                        enum:
+                        - redfish
+                        - ipmi
+                        type: string
+                      tlsInsecure:
+                        default: false
+                        description: TLSInsecure skips TLS certificate verification.
+                        type: boolean
+                    required:
+                    - authSecret
+                    - enabled
+                    type: object
+                  nut:
+                    description: NUT configures Network UPS Tools client monitoring.
+                    properties:
+                      authSecret:
+                        description: AuthSecret is the name of a Secret with NUT credentials
+                          (username, password).
+                        type: string
+                      enabled:
+                        default: false
+                        description: Enabled activates NUT client monitoring.
+                        type: boolean
+                      host:
+                        description: Host is the NUT server address.
+                        type: string
+                      pollingIntervalSeconds:
+                        default: 10
+                        description: PollingIntervalSeconds is how often to poll the
+                          NUT server.
+                        format: int32
+                        minimum: 5
+                        type: integer
+                      port:
+                        default: 3493
+                        description: Port is the NUT server port.
+                        format: int32
+                        type: integer
+                      upsName:
+                        description: UPSName is the UPS identifier on the NUT server.
+                        type: string
+                    required:
+                    - enabled
+                    - upsName
+                    type: object
+                  snmp:
+                    description: SNMP configures SNMP polling of UPS devices.
+                    properties:
+                      authSecret:
+                        description: AuthSecret is the name of a Secret with SNMPv3
+                          credentials (username, authPass, privPass).
+                        type: string
+                      batteryRemainingOID:
+                        description: BatteryRemainingOID is the OID for estimated
+                          battery minutes remaining.
+                        type: string
+                      batteryStatusOID:
+                        description: 'BatteryStatusOID is the OID for UPS battery
+                          status (default: UPS-MIB 1.3.6.1.2.1.33.1.2.1.0).'
+                        type: string
+                      community:
+                        default: public
+                        description: Community is the SNMP v2c community string.
+                        type: string
+                      enabled:
+                        default: false
+                        description: Enabled activates SNMP polling.
+                        type: boolean
+                      host:
+                        description: Host is the SNMP agent address (UPS/PDU).
+                        type: string
+                      outputSourceOID:
+                        description: 'OutputSourceOID is the OID for UPS output source
+                          (default: UPS-MIB 1.3.6.1.2.1.33.1.4.1.0).'
+                        type: string
+                      pollingIntervalSeconds:
+                        default: 30
+                        description: PollingIntervalSeconds is how often to poll the
+                          device.
+                        format: int32
+                        minimum: 5
+                        type: integer
+                      port:
+                        default: 161
+                        description: Port is the SNMP port.
+                        format: int32
+                        type: integer
+                      version:
+                        default: v2c
+                        description: 'Version is the SNMP version: "v2c" or "v3".'
+                        enum:
+                        - v2c
+                        - v3
+                        type: string
+                    required:
+                    - enabled
+                    type: object
+                  webhook:
+                    description: Webhook is the existing PSU alert webhook receiver.
+                    properties:
+                      authTokenSecret:
+                        description: |-
+                          AuthTokenSecret is the name of a Secret containing a "token" key
+                          used for bearer token authentication on the alert endpoint.
+                        type: string
+                      port:
+                        default: 8082
+                        description: Port is the HTTP port for the PSU alert webhook
+                          receiver.
+                        format: int32
+                        maximum: 65535
+                        minimum: 1024
+                        type: integer
+                    type: object
+                type: object
+              managementURL:
+                description: ManagementURL is the URL of the UPS/PDU management interface.
+                type: string
               notification:
                 description: Notification configures notification channels.
                 properties:
@@ -239,16 +390,14 @@ spec:
                 type: object
               powerConfirmationSeconds:
                 default: 120
-                description: |-
-                  PowerConfirmationSeconds is how long to wait before confirming a power outage.
-                  Backup starts immediately, but shutdown waits for confirmation.
+                description: PowerConfirmationSeconds is how long to wait before confirming
+                  a power outage.
                 format: int32
                 minimum: 10
                 type: integer
               shutdownDelayOverrideSeconds:
-                description: |-
-                  ShutdownDelayOverrideSeconds overrides the tier-based shutdown delay.
-                  If set, this value is used instead of the default for the cluster priority.
+                description: ShutdownDelayOverrideSeconds overrides the tier-based
+                  shutdown delay.
                 format: int32
                 type: integer
             required:
@@ -256,8 +405,8 @@ spec:
             - enabled
             type: object
           status:
-            description: PowerProtectionConfigStatus defines the observed state of
-              PowerProtectionConfig.
+            description: AutomatedProceduresConfigStatus defines the observed state
+              of AutomatedProceduresConfig.
             properties:
               activeEventRef:
                 description: ActiveEventRef is the name of the current active PowerEvent.
@@ -320,6 +469,32 @@ spec:
                   - message
                   - reason
                   - status
+                  - type
+                  type: object
+                type: array
+              eventSources:
+                description: EventSources reports the status of each configured event
+                  source.
+                items:
+                  description: EventSourceStatus reports the status of a single event
+                    source.
+                  properties:
+                    connected:
+                      description: Connected indicates whether the source is reachable.
+                      type: boolean
+                    lastCheck:
+                      description: LastCheck is the last time connectivity was verified.
+                      format: date-time
+                      type: string
+                    message:
+                      description: Message provides additional detail.
+                      type: string
+                    type:
+                      description: 'Type is the source type: "webhook", "snmp", "ipmi",
+                        "nut".'
+                      type: string
+                  required:
+                  - connected
                   - type
                   type: object
                 type: array

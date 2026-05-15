@@ -149,9 +149,161 @@ type NotificationConfig struct {
 	KubernetesEvents *KubernetesEventsConfig `json:"kubernetesEvents,omitempty"`
 }
 
-// PowerProtectionConfigSpec defines the desired state of PowerProtectionConfig.
-type PowerProtectionConfigSpec struct {
-	// Enabled is the master switch for power protection.
+// --- Event Sources ---
+
+// EventSourcesConfig configures how power and infrastructure events are detected.
+type EventSourcesConfig struct {
+	// Webhook is the existing PSU alert webhook receiver.
+	// +optional
+	Webhook *AlertEndpointConfig `json:"webhook,omitempty"`
+
+	// SNMP configures SNMP polling of UPS devices.
+	// +optional
+	SNMP *SNMPSourceConfig `json:"snmp,omitempty"`
+
+	// IPMI configures IPMI/Redfish BMC power monitoring.
+	// +optional
+	IPMI *IPMISourceConfig `json:"ipmi,omitempty"`
+
+	// NUT configures Network UPS Tools client monitoring.
+	// +optional
+	NUT *NUTSourceConfig `json:"nut,omitempty"`
+}
+
+type SNMPSourceConfig struct {
+	// Enabled activates SNMP polling.
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled"`
+
+	// Host is the SNMP agent address (UPS/PDU).
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// Port is the SNMP port.
+	// +kubebuilder:default=161
+	// +optional
+	Port int32 `json:"port,omitempty"`
+
+	// Community is the SNMP v2c community string.
+	// +kubebuilder:default="public"
+	// +optional
+	Community string `json:"community,omitempty"`
+
+	// Version is the SNMP version: "v2c" or "v3".
+	// +kubebuilder:validation:Enum=v2c;v3
+	// +kubebuilder:default="v2c"
+	// +optional
+	Version string `json:"version,omitempty"`
+
+	// PollingIntervalSeconds is how often to poll the device.
+	// +kubebuilder:default=30
+	// +kubebuilder:validation:Minimum=5
+	// +optional
+	PollingIntervalSeconds int32 `json:"pollingIntervalSeconds,omitempty"`
+
+	// BatteryStatusOID is the OID for UPS battery status (default: UPS-MIB 1.3.6.1.2.1.33.1.2.1.0).
+	// +optional
+	BatteryStatusOID string `json:"batteryStatusOID,omitempty"`
+
+	// OutputSourceOID is the OID for UPS output source (default: UPS-MIB 1.3.6.1.2.1.33.1.4.1.0).
+	// +optional
+	OutputSourceOID string `json:"outputSourceOID,omitempty"`
+
+	// BatteryRemainingOID is the OID for estimated battery minutes remaining.
+	// +optional
+	BatteryRemainingOID string `json:"batteryRemainingOID,omitempty"`
+
+	// AuthSecret is the name of a Secret with SNMPv3 credentials (username, authPass, privPass).
+	// +optional
+	AuthSecret string `json:"authSecret,omitempty"`
+}
+
+type IPMISourceConfig struct {
+	// Enabled activates IPMI/Redfish monitoring.
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled"`
+
+	// Host is the BMC address.
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// Port is the BMC port.
+	// +kubebuilder:default=443
+	// +optional
+	Port int32 `json:"port,omitempty"`
+
+	// Protocol is "redfish" or "ipmi".
+	// +kubebuilder:validation:Enum=redfish;ipmi
+	// +kubebuilder:default="redfish"
+	// +optional
+	Protocol string `json:"protocol,omitempty"`
+
+	// PollingIntervalSeconds is how often to poll the BMC.
+	// +kubebuilder:default=30
+	// +kubebuilder:validation:Minimum=5
+	// +optional
+	PollingIntervalSeconds int32 `json:"pollingIntervalSeconds,omitempty"`
+
+	// AuthSecret is the name of a Secret with BMC credentials (username, password).
+	// +kubebuilder:validation:Required
+	AuthSecret string `json:"authSecret"`
+
+	// TLSInsecure skips TLS certificate verification.
+	// +kubebuilder:default=false
+	// +optional
+	TLSInsecure bool `json:"tlsInsecure,omitempty"`
+}
+
+type NUTSourceConfig struct {
+	// Enabled activates NUT client monitoring.
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled"`
+
+	// Host is the NUT server address.
+	// +optional
+	Host string `json:"host,omitempty"`
+
+	// Port is the NUT server port.
+	// +kubebuilder:default=3493
+	// +optional
+	Port int32 `json:"port,omitempty"`
+
+	// UPSName is the UPS identifier on the NUT server.
+	// +kubebuilder:validation:Required
+	// +optional
+	UPSName string `json:"upsName,omitempty"`
+
+	// PollingIntervalSeconds is how often to poll the NUT server.
+	// +kubebuilder:default=10
+	// +kubebuilder:validation:Minimum=5
+	// +optional
+	PollingIntervalSeconds int32 `json:"pollingIntervalSeconds,omitempty"`
+
+	// AuthSecret is the name of a Secret with NUT credentials (username, password).
+	// +optional
+	AuthSecret string `json:"authSecret,omitempty"`
+}
+
+// EventSourceStatus reports the status of a single event source.
+type EventSourceStatus struct {
+	// Type is the source type: "webhook", "snmp", "ipmi", "nut".
+	Type string `json:"type"`
+
+	// Connected indicates whether the source is reachable.
+	Connected bool `json:"connected"`
+
+	// LastCheck is the last time connectivity was verified.
+	// +optional
+	LastCheck *metav1.Time `json:"lastCheck,omitempty"`
+
+	// Message provides additional detail.
+	// +optional
+	Message string `json:"message,omitempty"`
+}
+
+// AutomatedProceduresConfigSpec defines the desired state of AutomatedProceduresConfig.
+type AutomatedProceduresConfigSpec struct {
+	// Enabled is the master switch for automated procedures.
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled"`
 
@@ -168,7 +320,6 @@ type PowerProtectionConfigSpec struct {
 	BatteryCapacityMinutes int32 `json:"batteryCapacityMinutes,omitempty"`
 
 	// PowerConfirmationSeconds is how long to wait before confirming a power outage.
-	// Backup starts immediately, but shutdown waits for confirmation.
 	// +kubebuilder:default=120
 	// +kubebuilder:validation:Minimum=10
 	// +optional
@@ -181,11 +332,10 @@ type PowerProtectionConfigSpec struct {
 	AutonomousShutdown bool `json:"autonomousShutdown,omitempty"`
 
 	// ShutdownDelayOverrideSeconds overrides the tier-based shutdown delay.
-	// If set, this value is used instead of the default for the cluster priority.
 	// +optional
 	ShutdownDelayOverrideSeconds *int32 `json:"shutdownDelayOverrideSeconds,omitempty"`
 
-	// BackupConfig defines backup storage for emergency power-event backups.
+	// BackupConfig defines backup storage for emergency backups.
 	// +kubebuilder:validation:Required
 	BackupConfig BackupConfig `json:"backupConfig"`
 
@@ -193,13 +343,21 @@ type PowerProtectionConfigSpec struct {
 	// +optional
 	AlertEndpoint *AlertEndpointConfig `json:"alertEndpoint,omitempty"`
 
+	// EventSources configures how power and infrastructure events are detected.
+	// +optional
+	EventSources *EventSourcesConfig `json:"eventSources,omitempty"`
+
+	// ManagementURL is the URL of the UPS/PDU management interface.
+	// +optional
+	ManagementURL string `json:"managementURL,omitempty"`
+
 	// Notification configures notification channels.
 	// +optional
 	Notification *NotificationConfig `json:"notification,omitempty"`
 }
 
-// PowerProtectionConfigStatus defines the observed state of PowerProtectionConfig.
-type PowerProtectionConfigStatus struct {
+// AutomatedProceduresConfigStatus defines the observed state of AutomatedProceduresConfig.
+type AutomatedProceduresConfigStatus struct {
 	// AlertEndpointReady indicates the alert webhook server is listening.
 	AlertEndpointReady bool `json:"alertEndpointReady,omitempty"`
 
@@ -213,6 +371,10 @@ type PowerProtectionConfigStatus struct {
 	// ActiveEventRef is the name of the current active PowerEvent.
 	ActiveEventRef string `json:"activeEventRef,omitempty"`
 
+	// EventSources reports the status of each configured event source.
+	// +optional
+	EventSources []EventSourceStatus `json:"eventSources,omitempty"`
+
 	// Conditions represent the latest available observations.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
@@ -225,24 +387,24 @@ type PowerProtectionConfigStatus struct {
 // +kubebuilder:printcolumn:name="Enabled",type=boolean,JSONPath=`.spec.enabled`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// PowerProtectionConfig configures UPS/PSU-driven power protection for the cluster.
-type PowerProtectionConfig struct {
+// AutomatedProceduresConfig defines automated event response for the cluster.
+type AutomatedProceduresConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   PowerProtectionConfigSpec   `json:"spec,omitempty"`
-	Status PowerProtectionConfigStatus `json:"status,omitempty"`
+	Spec   AutomatedProceduresConfigSpec   `json:"spec,omitempty"`
+	Status AutomatedProceduresConfigStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// PowerProtectionConfigList contains a list of PowerProtectionConfig.
-type PowerProtectionConfigList struct {
+// AutomatedProceduresConfigList contains a list of AutomatedProceduresConfig.
+type AutomatedProceduresConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []PowerProtectionConfig `json:"items"`
+	Items           []AutomatedProceduresConfig `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&PowerProtectionConfig{}, &PowerProtectionConfigList{})
+	SchemeBuilder.Register(&AutomatedProceduresConfig{}, &AutomatedProceduresConfigList{})
 }

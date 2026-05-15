@@ -1,16 +1,16 @@
-# permissions for end users to view powerprotectionconfigs.
+# permissions for end users to view automatedproceduresconfigs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: pop
     app.kubernetes.io/managed-by: kustomize
-  name: powerprotectionconfig-viewer-role
+  name: automatedproceduresconfig-viewer-role
 rules:
 - apiGroups:
   - pop.openshift.io
   resources:
-  - powerprotectionconfigs
+  - automatedproceduresconfigs
   verbs:
   - get
   - list
@@ -18,6 +18,6 @@ rules:
 - apiGroups:
   - pop.openshift.io
   resources:
-  - powerprotectionconfigs/status
+  - automatedproceduresconfigs/status
   verbs:
   - get

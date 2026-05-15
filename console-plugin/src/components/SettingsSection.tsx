@@ -38,11 +38,6 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, namespace: _n
   const [s3CredSecret, setS3CredSecret] = useState(spec?.backup?.storage?.exportTarget?.s3?.credentialsSecret || '');
   const [s3Prefix, setS3Prefix] = useState(spec?.backup?.storage?.exportTarget?.s3?.prefix || '');
 
-  // PSU
-  const [psuManagementURL, setPsuManagementURL] = useState(spec?.powerProtection?.managementURL || '');
-  const [psuAlertPort, setPsuAlertPort] = useState(spec?.powerProtection?.alertEndpoint?.port || 8082);
-  const [psuAuthSecret, setPsuAuthSecret] = useState(spec?.powerProtection?.alertEndpoint?.authTokenSecret || '');
-
   // Notifications
   const [webhookEnabled, setWebhookEnabled] = useState(spec?.notification?.webhook?.enabled || false);
   const [webhookURL, setWebhookURL] = useState(spec?.notification?.webhook?.url || '');
@@ -89,19 +84,6 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, namespace: _n
           enabled: scheduleEnabled,
           frequency,
           time: scheduleTime,
-        },
-      },
-      {
-        op: 'replace' as const,
-        path: '/spec/powerProtection/managementURL',
-        value: psuManagementURL,
-      },
-      {
-        op: 'replace' as const,
-        path: '/spec/powerProtection/alertEndpoint',
-        value: {
-          port: psuAlertPort,
-          authTokenSecret: psuAuthSecret,
         },
       },
       {
@@ -246,43 +228,6 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, namespace: _n
                   </GridItem>
                 </>
               )}
-            </Grid>
-
-          <Divider style={{ margin: '24px 0' }} />
-
-          {/* PSU / Power */}
-          <Title headingLevel="h3" style={{ marginBottom: 12 }}>PSU Management</Title>
-            <Grid hasGutter>
-              <GridItem span={6}>
-                <FormGroup label="UPS/PDU Management URL" fieldId="psu-url">
-                  <TextInput
-                    id="psu-url"
-                    value={psuManagementURL}
-                    onChange={(_e, val) => setPsuManagementURL(val)}
-                    placeholder="https://192.168.1.100"
-                  />
-                </FormGroup>
-              </GridItem>
-              <GridItem span={3}>
-                <FormGroup label="Alert Webhook Port" fieldId="psu-port">
-                  <TextInput
-                    id="psu-port"
-                    type="number"
-                    value={String(psuAlertPort)}
-                    onChange={(_e, val) => setPsuAlertPort(Number(val))}
-                  />
-                </FormGroup>
-              </GridItem>
-              <GridItem span={3}>
-                <FormGroup label="Auth Token Secret" fieldId="psu-auth">
-                  <TextInput
-                    id="psu-auth"
-                    value={psuAuthSecret}
-                    onChange={(_e, val) => setPsuAuthSecret(val)}
-                    placeholder="psu-alert-token"
-                  />
-                </FormGroup>
-              </GridItem>
             </Grid>
 
           <Divider style={{ margin: '24px 0' }} />

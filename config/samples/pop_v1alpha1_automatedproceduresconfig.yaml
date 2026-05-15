@@ -1,5 +1,5 @@
 apiVersion: pop.openshift.io/v1alpha1
-kind: PowerProtectionConfig
+kind: AutomatedProceduresConfig
 metadata:
   labels:
     app.kubernetes.io/name: pop
@@ -20,6 +20,27 @@ spec:
   alertEndpoint:
     port: 8082
     authTokenSecret: psu-alert-token  # Secret with "token" key for bearer auth
+
+  eventSources:
+    webhook:
+      port: 8082
+    # snmp:
+    #   enabled: true
+    #   host: "192.168.1.100"
+    #   port: 161
+    #   community: "public"
+    #   version: "v2c"
+    #   pollingIntervalSeconds: 30
+    # ipmi:
+    #   enabled: true
+    #   host: "192.168.1.200"
+    #   protocol: "redfish"
+    #   authSecret: bmc-credentials
+    # nut:
+    #   enabled: true
+    #   host: "192.168.1.50"
+    #   upsName: "ups-1"
+    #   pollingIntervalSeconds: 10
 
   notification:
     kubernetesEvents:

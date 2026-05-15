@@ -9,23 +9,23 @@ import {
 } from '@patternfly/react-core';
 import { useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
 import {
-  ClusterLifecycleConfigModel,
+  AutomatedProceduresConfigModel,
   PowerEventModel,
 } from '../models';
 import {
-  ClusterLifecycleConfigResource,
+  AutomatedProceduresConfigResource,
   PowerEventResource,
 } from '../types';
-import PowerSection from './PowerSection';
+import AutomatedProceduresSection from './AutomatedProceduresSection';
 
 const NAMESPACE = 'pop-system';
 
-const PowerPage: React.FC = () => {
-  const [config, configLoaded, configError] = useK8sWatchResource<ClusterLifecycleConfigResource>({
+const AutomatedProceduresPage: React.FC = () => {
+  const [apConfig, apConfigLoaded, apConfigError] = useK8sWatchResource<AutomatedProceduresConfigResource>({
     groupVersionKind: {
-      group: ClusterLifecycleConfigModel.apiGroup,
-      version: ClusterLifecycleConfigModel.apiVersion,
-      kind: ClusterLifecycleConfigModel.kind,
+      group: AutomatedProceduresConfigModel.apiGroup,
+      version: AutomatedProceduresConfigModel.apiVersion,
+      kind: AutomatedProceduresConfigModel.kind,
     },
     namespace: NAMESPACE,
     name: 'default',
@@ -45,42 +45,42 @@ const PowerPage: React.FC = () => {
     namespaced: true,
   });
 
-  if (!configLoaded) {
+  if (!apConfigLoaded) {
     return (
       <>
         <PageSection variant="light">
-          <Title headingLevel="h1">Power Protection</Title>
+          <Title headingLevel="h1">Automated Procedures</Title>
         </PageSection>
         <PageSection>
           <EmptyState>
             <Spinner size="xl" />
-            <EmptyStateBody>Loading power protection data...</EmptyStateBody>
+            <EmptyStateBody>Loading automated procedures data...</EmptyStateBody>
           </EmptyState>
         </PageSection>
       </>
     );
   }
 
-  const hasError = configError || powerEventsError;
+  const hasError = apConfigError || powerEventsError;
 
   return (
     <>
       <PageSection variant="light">
-        <Title headingLevel="h1">Power Protection</Title>
+        <Title headingLevel="h1">Automated Procedures</Title>
       </PageSection>
 
       {hasError && (
         <PageSection>
           <Alert variant="warning" isInline title="Some resources could not be loaded">
-            {configError && <p>Config: {String(configError)}</p>}
+            {apConfigError && <p>Config: {String(apConfigError)}</p>}
             {powerEventsError && <p>Power Events: {String(powerEventsError)}</p>}
           </Alert>
         </PageSection>
       )}
 
       <PageSection>
-        <PowerSection
-          config={config}
+        <AutomatedProceduresSection
+          apConfig={apConfig}
           powerEvents={powerEvents || []}
           powerEventsLoaded={powerEventsLoaded}
           namespace={NAMESPACE}
@@ -90,4 +90,4 @@ const PowerPage: React.FC = () => {
   );
 };
 
-export default PowerPage;
+export default AutomatedProceduresPage;

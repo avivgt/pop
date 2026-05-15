@@ -28,8 +28,8 @@ resources:
 - workloadevacuation_viewer_role.yaml
 - powerevent_editor_role.yaml
 - powerevent_viewer_role.yaml
-- powerprotectionconfig_editor_role.yaml
-- powerprotectionconfig_viewer_role.yaml
+- automatedproceduresconfig_editor_role.yaml
+- automatedproceduresconfig_viewer_role.yaml
 - clusterrestart_editor_role.yaml
 - clusterrestart_viewer_role.yaml
 - backupschedule_editor_role.yaml

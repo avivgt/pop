@@ -43,7 +43,7 @@ type PowerEventReconciler struct {
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=powerevents,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=powerevents/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=powerevents/finalizers,verbs=update
-// +kubebuilder:rbac:groups=pop.openshift.io,resources=powerprotectionconfigs,verbs=get;list;watch
+// +kubebuilder:rbac:groups=pop.openshift.io,resources=automatedproceduresconfigs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=etcdbackups,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=clustershutdowns,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
@@ -168,12 +168,12 @@ func (r *PowerEventReconciler) handlePowerRestored(ctx context.Context, event *p
 func (r *PowerEventReconciler) handlePowerFailure(ctx context.Context, event *popv1alpha1.PowerEvent) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	// Look up the PowerProtectionConfig singleton named "default".
-	config := &popv1alpha1.PowerProtectionConfig{}
+	// Look up the AutomatedProceduresConfig singleton named "default".
+	config := &popv1alpha1.AutomatedProceduresConfig{}
 	err := r.Get(ctx, types.NamespacedName{Name: "default", Namespace: event.Namespace}, config)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return r.setFailed(ctx, event, "PowerProtectionConfig 'default' not found")
+			return r.setFailed(ctx, event, "AutomatedProceduresConfig 'default' not found")
 		}
 		return ctrl.Result{}, err
 	}
@@ -343,12 +343,12 @@ func (r *PowerEventReconciler) reconcileConfirmed(ctx context.Context, event *po
 		return r.setCancelled(ctx, event)
 	}
 
-	// Look up PowerProtectionConfig.
-	config := &popv1alpha1.PowerProtectionConfig{}
+	// Look up AutomatedProceduresConfig.
+	config := &popv1alpha1.AutomatedProceduresConfig{}
 	err := r.Get(ctx, types.NamespacedName{Name: "default", Namespace: event.Namespace}, config)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return r.setFailed(ctx, event, "PowerProtectionConfig 'default' not found during confirmed phase")
+			return r.setFailed(ctx, event, "AutomatedProceduresConfig 'default' not found during confirmed phase")
 		}
 		return ctrl.Result{}, err
 	}
@@ -421,11 +421,11 @@ func (r *PowerEventReconciler) reconcileShuttingDown(ctx context.Context, event 
 
 	if event.Status.ClusterShutdownRef == "" {
 		// Create a ClusterShutdown CR.
-		config := &popv1alpha1.PowerProtectionConfig{}
+		config := &popv1alpha1.AutomatedProceduresConfig{}
 		err := r.Get(ctx, types.NamespacedName{Name: "default", Namespace: event.Namespace}, config)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				return r.setFailed(ctx, event, "PowerProtectionConfig 'default' not found during shutdown phase")
+				return r.setFailed(ctx, event, "AutomatedProceduresConfig 'default' not found during shutdown phase")
 			}
 			return ctrl.Result{}, err
 		}

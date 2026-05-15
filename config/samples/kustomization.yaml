@@ -4,7 +4,7 @@ resources:
 - pop_v1alpha1_clustershutdown.yaml
 - pop_v1alpha1_backupschedule.yaml
 - pop_v1alpha1_clusterrestart.yaml
-- pop_v1alpha1_powerprotectionconfig.yaml
+- pop_v1alpha1_automatedproceduresconfig.yaml
 - pop_v1alpha1_powerevent.yaml
 - pop_v1alpha1_workloadevacuation.yaml
 - pop_v1alpha1_clusterlifecycleconfig.yaml

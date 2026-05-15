@@ -12,13 +12,6 @@ export interface BackupStatusSummary {
   resolvedSchedule?: string;
 }
 
-export interface PowerStatusSummary {
-  status?: string;
-  activeEvent?: string;
-  lastEventTime?: string;
-  alertEndpointReady?: boolean;
-}
-
 export interface ClusterStatusSummary {
   certificateExpiry?: string;
   certificateRemainingDays?: number;
@@ -64,16 +57,6 @@ export interface AlertEndpointConfig {
   authTokenSecret?: string;
 }
 
-export interface LifecyclePowerConfig {
-  enabled: boolean;
-  clusterPriority?: string;
-  batteryCapacityMinutes?: number;
-  powerConfirmationSeconds?: number;
-  autonomousShutdown?: boolean;
-  alertEndpoint?: AlertEndpointConfig;
-  managementURL?: string;
-}
-
 export interface WebhookNotificationConfig {
   enabled: boolean;
   url?: string;
@@ -92,12 +75,10 @@ export interface ClusterLifecycleConfigResource extends K8sResourceCommon {
       cordonNodes?: boolean;
       notifyApplications?: boolean;
     };
-    powerProtection?: LifecyclePowerConfig;
     notification?: NotificationConfig;
   };
   status?: {
     backup?: BackupStatusSummary;
-    power?: PowerStatusSummary;
     cluster?: ClusterStatusSummary;
   };
 }
@@ -179,6 +160,79 @@ export interface ClusterRestartResource extends K8sResourceCommon {
     readyNodes?: number;
     approvedCSRs?: number;
     message?: string;
+  };
+}
+
+// --- AutomatedProceduresConfig ---
+
+export interface SNMPSourceConfig {
+  enabled: boolean;
+  host?: string;
+  port?: number;
+  community?: string;
+  version?: string;
+  pollingIntervalSeconds?: number;
+  batteryStatusOID?: string;
+  outputSourceOID?: string;
+  batteryRemainingOID?: string;
+  authSecret?: string;
+}
+
+export interface IPMISourceConfig {
+  enabled: boolean;
+  host?: string;
+  port?: number;
+  protocol?: string;
+  pollingIntervalSeconds?: number;
+  authSecret?: string;
+  tlsInsecure?: boolean;
+}
+
+export interface NUTSourceConfig {
+  enabled: boolean;
+  host?: string;
+  port?: number;
+  upsName?: string;
+  pollingIntervalSeconds?: number;
+  authSecret?: string;
+}
+
+export interface EventSourcesConfig {
+  webhook?: AlertEndpointConfig;
+  snmp?: SNMPSourceConfig;
+  ipmi?: IPMISourceConfig;
+  nut?: NUTSourceConfig;
+}
+
+export interface EventSourceStatus {
+  type: string;
+  connected: boolean;
+  lastCheck?: string;
+  message?: string;
+}
+
+export interface AutomatedProceduresConfigResource extends K8sResourceCommon {
+  spec?: {
+    enabled?: boolean;
+    clusterPriority?: string;
+    batteryCapacityMinutes?: number;
+    powerConfirmationSeconds?: number;
+    autonomousShutdown?: boolean;
+    backupConfig?: {
+      pvcName?: string;
+      shutdownDelayMinutes?: number;
+    };
+    alertEndpoint?: AlertEndpointConfig;
+    eventSources?: EventSourcesConfig;
+    managementURL?: string;
+    notification?: NotificationConfig;
+  };
+  status?: {
+    alertEndpointReady?: boolean;
+    powerStatus?: string;
+    lastPowerEvent?: string;
+    activeEventRef?: string;
+    eventSources?: EventSourceStatus[];
   };
 }
 

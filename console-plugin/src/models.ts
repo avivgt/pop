@@ -55,6 +55,17 @@ export const ClusterRestartModel: K8sModel = {
   namespaced: true,
 };
 
+export const AutomatedProceduresConfigModel: K8sModel = {
+  apiGroup: 'pop.openshift.io',
+  apiVersion: 'v1alpha1',
+  kind: 'AutomatedProceduresConfig',
+  plural: 'automatedproceduresconfigs',
+  label: 'AutomatedProceduresConfig',
+  labelPlural: 'AutomatedProceduresConfigs',
+  abbr: 'APC',
+  namespaced: true,
+};
+
 export const PowerEventModel: K8sModel = {
   apiGroup: 'pop.openshift.io',
   apiVersion: 'v1alpha1',

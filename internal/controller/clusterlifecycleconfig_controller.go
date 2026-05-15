@@ -71,8 +71,6 @@ func (r *ClusterLifecycleConfigReconciler) Reconcile(ctx context.Context, req ct
 		requeueAfter = backupRequeue
 	}
 
-	r.reconcilePowerProtection(ctx, config)
-
 	if config.Spec.Backup.Schedule != nil && config.Spec.Backup.Schedule.Enabled {
 		meta.SetStatusCondition(&config.Status.Conditions, metav1.Condition{
 			Type:    "BackupScheduleReady",
@@ -265,53 +263,6 @@ func (r *ClusterLifecycleConfigReconciler) enforceBackupRetention(ctx context.Co
 			_ = r.Delete(ctx, &completed[i])
 		}
 	}
-}
-
-func (r *ClusterLifecycleConfigReconciler) reconcilePowerProtection(ctx context.Context, config *popv1alpha1.ClusterLifecycleConfig) {
-	if config.Spec.PowerProtection == nil || !config.Spec.PowerProtection.Enabled {
-		config.Status.Power.Status = popv1alpha1.PowerStatusUnknown
-		config.Status.Power.AlertEndpointReady = false
-		popmetrics.PowerStatus.Set(0)
-		return
-	}
-
-	config.Status.Power.AlertEndpointReady = true
-	config.Status.Power.Status = popv1alpha1.PowerStatusNormal
-
-	eventList := &popv1alpha1.PowerEventList{}
-	if err := r.List(ctx, eventList, client.InNamespace(config.Namespace)); err == nil && len(eventList.Items) > 0 {
-		sort.Slice(eventList.Items, func(i, j int) bool {
-			return eventList.Items[i].CreationTimestamp.After(eventList.Items[j].CreationTimestamp.Time)
-		})
-		latest := &eventList.Items[0]
-		t := latest.CreationTimestamp
-		config.Status.Power.LastEventTime = &t
-
-		if latest.Spec.EventType == popv1alpha1.PowerEventTypeFailure {
-			switch latest.Status.Phase {
-			case popv1alpha1.PowerEventPhaseDetected,
-				popv1alpha1.PowerEventPhaseBackingUp,
-				popv1alpha1.PowerEventPhaseAwaitingConfirmation,
-				popv1alpha1.PowerEventPhaseConfirmed,
-				popv1alpha1.PowerEventPhaseShuttingDown:
-				config.Status.Power.Status = popv1alpha1.PowerStatusOnBattery
-				config.Status.Power.ActiveEvent = latest.Name
-			}
-		}
-	}
-
-	if config.Status.Power.Status == popv1alpha1.PowerStatusOnBattery {
-		popmetrics.PowerStatus.Set(1)
-	} else {
-		popmetrics.PowerStatus.Set(0)
-	}
-
-	meta.SetStatusCondition(&config.Status.Conditions, metav1.Condition{
-		Type:    "PowerProtectionReady",
-		Status:  metav1.ConditionTrue,
-		Reason:  "Enabled",
-		Message: fmt.Sprintf("Power protection active, priority: %s", config.Spec.PowerProtection.ClusterPriority),
-	})
 }
 
 func resolveFrequencyConfig(sched *popv1alpha1.BackupScheduleConfig) (string, string) {

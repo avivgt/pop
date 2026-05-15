@@ -16,7 +16,7 @@
       "DashboardPage": "./components/DashboardPage",
       "BackupPage": "./components/BackupPage",
       "ShutdownPage": "./components/ShutdownPage",
-      "PowerPage": "./components/PowerPage",
+      "AutomatedProceduresPage": "./components/AutomatedProceduresPage",
       "SettingsPage": "./components/SettingsPage",
       "EtcdBackupList": "./components/EtcdBackupList",
       "ClusterShutdownList": "./components/ClusterShutdownList",

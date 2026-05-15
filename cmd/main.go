@@ -39,6 +39,7 @@ import (
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
 	"github.com/avivgt/pop/internal/alert"
 	"github.com/avivgt/pop/internal/controller"
+	"github.com/avivgt/pop/internal/eventsource"
 	_ "github.com/avivgt/pop/internal/metrics"
 	// +kubebuilder:scaffold:imports
 )
@@ -153,6 +154,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	namespace := os.Getenv("POD_NAMESPACE")
+	if namespace == "" {
+		namespace = "pop-system"
+	}
+
+	sourceManager := eventsource.NewManager(mgr.GetClient(), namespace, ctrl.Log.WithName("eventsource"))
+
 	if err = (&controller.EtcdBackupReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
@@ -182,11 +190,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterRestart")
 		os.Exit(1)
 	}
-	if err = (&controller.PowerProtectionConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+	if err = (&controller.AutomatedProceduresConfigReconciler{
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		SourceManager: sourceManager,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PowerProtectionConfig")
+		setupLog.Error(err, "unable to create controller", "controller", "AutomatedProceduresConfig")
 		os.Exit(1)
 	}
 	if err = (&controller.PowerEventReconciler{
@@ -215,10 +224,6 @@ func main() {
 	var alertPort int32
 	flag.Visit(func(f *flag.Flag) {})
 	alertPort = 8082
-	namespace := os.Getenv("POD_NAMESPACE")
-	if namespace == "" {
-		namespace = "pop-system"
-	}
 	alertServer := alert.NewServer(
 		mgr.GetClient(),
 		namespace,

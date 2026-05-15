@@ -113,13 +113,13 @@ rules:
 - apiGroups:
   - pop.openshift.io
   resources:
+  - automatedproceduresconfigs
   - backupschedules
   - clusterlifecycleconfigs
   - clusterrestarts
   - clustershutdowns
   - etcdbackups
   - powerevents
-  - powerprotectionconfigs
   - workloadevacuations
   verbs:
   - create
@@ -132,26 +132,26 @@ rules:
 - apiGroups:
   - pop.openshift.io
   resources:
+  - automatedproceduresconfigs/finalizers
   - backupschedules/finalizers
   - clusterlifecycleconfigs/finalizers
   - clusterrestarts/finalizers
   - clustershutdowns/finalizers
   - etcdbackups/finalizers
   - powerevents/finalizers
-  - powerprotectionconfigs/finalizers
   - workloadevacuations/finalizers
   verbs:
   - update
 - apiGroups:
   - pop.openshift.io
   resources:
+  - automatedproceduresconfigs/status
   - backupschedules/status
   - clusterlifecycleconfigs/status
   - clusterrestarts/status
   - clustershutdowns/status
   - etcdbackups/status
   - powerevents/status
-  - powerprotectionconfigs/status
   - workloadevacuations/status
   verbs:
   - get

@@ -48,7 +48,7 @@ type NotificationPayload struct {
 }
 
 // Service sends notifications through multiple channels configured in
-// a PowerProtectionConfig.
+// a AutomatedProceduresConfig.
 type Service struct {
 	client client.Client
 	logger logr.Logger
@@ -63,10 +63,10 @@ func NewService(client client.Client, logger logr.Logger) *Service {
 }
 
 // Notify sends a notification through all enabled channels configured in the
-// PowerProtectionConfig. Each channel is tried independently; a failure in one
+// AutomatedProceduresConfig. Each channel is tried independently; a failure in one
 // channel does not block the others. Returns a slice of NotificationRecord
 // describing the outcome of each channel attempt.
-func (s *Service) Notify(ctx context.Context, config *popv1alpha1.PowerProtectionConfig, event *popv1alpha1.PowerEvent, message string) []popv1alpha1.NotificationRecord {
+func (s *Service) Notify(ctx context.Context, config *popv1alpha1.AutomatedProceduresConfig, event *popv1alpha1.PowerEvent, message string) []popv1alpha1.NotificationRecord {
 	var records []popv1alpha1.NotificationRecord
 
 	payload := NotificationPayload{
@@ -310,7 +310,7 @@ type alertmanagerAlert struct {
 }
 
 // sendAlertmanager pushes an alert to the Alertmanager API.
-func (s *Service) sendAlertmanager(ctx context.Context, amConfig *popv1alpha1.AlertmanagerNotificationConfig, payload NotificationPayload, config *popv1alpha1.PowerProtectionConfig) popv1alpha1.NotificationRecord {
+func (s *Service) sendAlertmanager(ctx context.Context, amConfig *popv1alpha1.AlertmanagerNotificationConfig, payload NotificationPayload, config *popv1alpha1.AutomatedProceduresConfig) popv1alpha1.NotificationRecord {
 	record := popv1alpha1.NotificationRecord{
 		Channel: "alertmanager",
 		SentAt:  metav1.Now(),

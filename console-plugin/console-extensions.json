@@ -66,11 +66,11 @@
   {
     "type": "console.navigation/href",
     "properties": {
-      "id": "pop-power",
+      "id": "pop-automated-procedures",
       "perspective": "admin",
       "section": "backup-and-restore",
-      "name": "Power Protection",
-      "href": "/backup-and-restore/power",
+      "name": "Automated Procedures",
+      "href": "/backup-and-restore/automated-procedures",
       "insertAfter": "pop-shutdown"
     },
     "flags": {
@@ -85,7 +85,7 @@
       "section": "backup-and-restore",
       "name": "Settings",
       "href": "/backup-and-restore/settings",
-      "insertAfter": "pop-power"
+      "insertAfter": "pop-automated-procedures"
     },
     "flags": {
       "required": ["POP_ENABLED"]
@@ -136,11 +136,11 @@
   {
     "type": "console.page/route",
     "properties": {
-      "path": "/backup-and-restore/power",
+      "path": "/backup-and-restore/automated-procedures",
       "exact": true,
       "perspective": "admin",
       "component": {
-        "$codeRef": "PowerPage"
+        "$codeRef": "AutomatedProceduresPage"
       }
     },
     "flags": {

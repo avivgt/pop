@@ -21,15 +21,13 @@ import {
 import { useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
 import {
   ClusterLifecycleConfigModel,
-  EtcdBackupModel,
   ClusterShutdownModel,
-  PowerEventModel,
+  AutomatedProceduresConfigModel,
 } from '../models';
 import {
   ClusterLifecycleConfigResource,
-  EtcdBackupResource,
   ClusterShutdownResource,
-  PowerEventResource,
+  AutomatedProceduresConfigResource,
 } from '../types';
 import StatusBar from './StatusBar';
 import PhaseLabel from './shared/PhaseLabel';
@@ -49,19 +47,6 @@ const DashboardPage: React.FC = () => {
     namespaced: true,
   });
 
-  const [etcdBackups, , etcdBackupsError] = useK8sWatchResource<
-    EtcdBackupResource[]
-  >({
-    groupVersionKind: {
-      group: EtcdBackupModel.apiGroup,
-      version: EtcdBackupModel.apiVersion,
-      kind: EtcdBackupModel.kind,
-    },
-    namespace: NAMESPACE,
-    isList: true,
-    namespaced: true,
-  });
-
   const [clusterShutdowns, , shutdownsError] = useK8sWatchResource<
     ClusterShutdownResource[]
   >({
@@ -75,16 +60,14 @@ const DashboardPage: React.FC = () => {
     namespaced: true,
   });
 
-  const [powerEvents, , powerEventsError] = useK8sWatchResource<
-    PowerEventResource[]
-  >({
+  const [apConfig, , apConfigError] = useK8sWatchResource<AutomatedProceduresConfigResource>({
     groupVersionKind: {
-      group: PowerEventModel.apiGroup,
-      version: PowerEventModel.apiVersion,
-      kind: PowerEventModel.kind,
+      group: AutomatedProceduresConfigModel.apiGroup,
+      version: AutomatedProceduresConfigModel.apiVersion,
+      kind: AutomatedProceduresConfigModel.kind,
     },
     namespace: NAMESPACE,
-    isList: true,
+    name: 'default',
     namespaced: true,
   });
 
@@ -104,14 +87,10 @@ const DashboardPage: React.FC = () => {
     );
   }
 
-  const hasError = configError || etcdBackupsError || shutdownsError || powerEventsError;
+  const hasError = configError || shutdownsError || apConfigError;
 
-  const sortedBackups = [...(etcdBackups || [])].sort(
-    (a, b) =>
-      new Date(b.metadata?.creationTimestamp || 0).getTime() -
-      new Date(a.metadata?.creationTimestamp || 0).getTime(),
-  );
-  const latestBackup = sortedBackups[0];
+  const backupStatus = config?.status?.backup;
+  const scheduleEnabled = config?.spec?.backup?.schedule?.enabled;
 
   const sortedShutdowns = [...(clusterShutdowns || [])].sort(
     (a, b) =>
@@ -123,10 +102,7 @@ const DashboardPage: React.FC = () => {
   );
   const latestShutdown = activeShutdown || sortedShutdowns[0];
 
-  const powerStatus = config?.status?.power?.status || 'Normal';
-  const recentEvents = (powerEvents || []).length;
-
-  const scheduleEnabled = config?.spec?.backup?.schedule?.enabled;
+  const powerStatus = apConfig?.status?.powerStatus || 'Unknown';
 
   return (
     <>
@@ -138,15 +114,14 @@ const DashboardPage: React.FC = () => {
         <PageSection>
           <Alert variant="warning" isInline title="Some resources could not be loaded">
             {configError && <p>Config: {String(configError)}</p>}
-            {etcdBackupsError && <p>Backups: {String(etcdBackupsError)}</p>}
             {shutdownsError && <p>Shutdowns: {String(shutdownsError)}</p>}
-            {powerEventsError && <p>Power Events: {String(powerEventsError)}</p>}
+            {apConfigError && <p>Automated Procedures: {String(apConfigError)}</p>}
           </Alert>
         </PageSection>
       )}
 
       <PageSection>
-        <StatusBar config={config} loaded={configLoaded} />
+        <StatusBar config={config} apConfig={apConfig} loaded={configLoaded} />
       </PageSection>
 
       <PageSection>
@@ -159,26 +134,21 @@ const DashboardPage: React.FC = () => {
                   <DescriptionListGroup>
                     <DescriptionListTerm>Total Backups</DescriptionListTerm>
                     <DescriptionListDescription>
-                      {(etcdBackups || []).length}
+                      {backupStatus?.totalBackups ?? 0}
                     </DescriptionListDescription>
                   </DescriptionListGroup>
                   <DescriptionListGroup>
                     <DescriptionListTerm>Latest</DescriptionListTerm>
                     <DescriptionListDescription>
-                      {latestBackup ? (
-                        <>
-                          <PhaseLabel phase={latestBackup.status?.phase} />{' '}
-                          {formatTimestamp(latestBackup.metadata?.creationTimestamp)}
-                        </>
-                      ) : (
-                        'No backups yet'
-                      )}
+                      {backupStatus?.lastBackupTime
+                        ? formatTimestamp(backupStatus.lastBackupTime)
+                        : 'No backups yet'}
                     </DescriptionListDescription>
                   </DescriptionListGroup>
                   <DescriptionListGroup>
                     <DescriptionListTerm>Schedule</DescriptionListTerm>
                     <DescriptionListDescription>
-                      {scheduleEnabled ? 'Enabled' : 'Disabled'}
+                      {scheduleEnabled ? backupStatus?.resolvedSchedule || 'Enabled' : 'Disabled'}
                     </DescriptionListDescription>
                   </DescriptionListGroup>
                 </DescriptionList>
@@ -228,7 +198,7 @@ const DashboardPage: React.FC = () => {
 
           <GridItem md={6}>
             <Card isFullHeight>
-              <CardTitle>Power Protection</CardTitle>
+              <CardTitle>Automated Procedures</CardTitle>
               <CardBody>
                 <DescriptionList isCompact isHorizontal>
                   <DescriptionListGroup>
@@ -239,16 +209,16 @@ const DashboardPage: React.FC = () => {
                     </DescriptionListDescription>
                   </DescriptionListGroup>
                   <DescriptionListGroup>
-                    <DescriptionListTerm>Power Events</DescriptionListTerm>
+                    <DescriptionListTerm>Enabled</DescriptionListTerm>
                     <DescriptionListDescription>
-                      {recentEvents} recorded
+                      {apConfig?.spec?.enabled ? 'Yes' : 'No'}
                     </DescriptionListDescription>
                   </DescriptionListGroup>
                 </DescriptionList>
               </CardBody>
               <CardFooter>
-                <Button variant="link" component="a" href="/backup-and-restore/power" isInline>
-                  Power Protection
+                <Button variant="link" component="a" href="/backup-and-restore/automated-procedures" isInline>
+                  Automated Procedures
                 </Button>
               </CardFooter>
             </Card>

@@ -123,47 +123,6 @@ type LifecycleShutdownConfig struct {
 	PreShutdownHooks []ShutdownHook `json:"preShutdownHooks,omitempty"`
 }
 
-// --- Power protection configuration ---
-
-type LifecyclePowerConfig struct {
-	// Enabled activates UPS/PSU power protection.
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled"`
-
-	// ClusterPriority determines shutdown delay tier.
-	// +kubebuilder:validation:Enum=Critical;Standard;BestEffort
-	// +kubebuilder:default=Standard
-	// +optional
-	ClusterPriority ClusterPriority `json:"clusterPriority,omitempty"`
-
-	// BatteryCapacityMinutes is the expected UPS battery duration.
-	// +kubebuilder:default=15
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	BatteryCapacityMinutes int32 `json:"batteryCapacityMinutes,omitempty"`
-
-	// PowerConfirmationSeconds is the wait before confirming an outage.
-	// +kubebuilder:default=120
-	// +kubebuilder:validation:Minimum=10
-	// +optional
-	PowerConfirmationSeconds int32 `json:"powerConfirmationSeconds,omitempty"`
-
-	// AutonomousShutdown auto-shuts down after confirmation + priority delay.
-	// +kubebuilder:default=false
-	// +optional
-	AutonomousShutdown bool `json:"autonomousShutdown,omitempty"`
-
-	// AlertEndpoint configures the PSU webhook receiver.
-	// +optional
-	AlertEndpoint *AlertEndpointConfig `json:"alertEndpoint,omitempty"`
-
-	// ManagementURL is the URL of the UPS/PDU management interface
-	// (e.g. "https://192.168.1.100" for an APC, Eaton, or Redfish endpoint).
-	// Used for display in the dashboard and future health-checking.
-	// +optional
-	ManagementURL string `json:"managementURL,omitempty"`
-}
-
 // --- Top-level spec ---
 
 // ClusterLifecycleConfigSpec is the single configuration for all POP features.
@@ -174,10 +133,6 @@ type ClusterLifecycleConfigSpec struct {
 	// Shutdown configures cluster shutdown defaults.
 	// +optional
 	Shutdown *LifecycleShutdownConfig `json:"shutdown,omitempty"`
-
-	// PowerProtection configures UPS/PSU-driven power protection.
-	// +optional
-	PowerProtection *LifecyclePowerConfig `json:"powerProtection,omitempty"`
 
 	// Notification configures alert channels.
 	// +optional
@@ -203,17 +158,6 @@ type BackupStatusSummary struct {
 	ResolvedSchedule string `json:"resolvedSchedule,omitempty"`
 }
 
-type PowerStatusSummary struct {
-	// Status is the current power state.
-	Status PowerStatus `json:"status,omitempty"`
-	// ActiveEvent is the name of the current active PowerEvent.
-	ActiveEvent string `json:"activeEvent,omitempty"`
-	// LastEventTime is the timestamp of the last power event.
-	LastEventTime *metav1.Time `json:"lastEventTime,omitempty"`
-	// AlertEndpointReady indicates the webhook server is running.
-	AlertEndpointReady bool `json:"alertEndpointReady,omitempty"`
-}
-
 type ClusterStatusSummary struct {
 	// CertificateExpiry is when the kube-apiserver cert expires.
 	CertificateExpiry *metav1.Time `json:"certificateExpiry,omitempty"`
@@ -231,8 +175,6 @@ type ClusterStatusSummary struct {
 type ClusterLifecycleConfigStatus struct {
 	// Backup summarizes backup status.
 	Backup BackupStatusSummary `json:"backup,omitempty"`
-	// Power summarizes power protection status.
-	Power PowerStatusSummary `json:"power,omitempty"`
 	// Cluster summarizes cluster health.
 	Cluster ClusterStatusSummary `json:"cluster,omitempty"`
 	// Conditions represent the latest observations.
@@ -243,7 +185,6 @@ type ClusterLifecycleConfigStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Schedule",type=string,JSONPath=`.status.backup.resolvedSchedule`
 // +kubebuilder:printcolumn:name="Last Backup",type=date,JSONPath=`.status.backup.lastBackupTime`
-// +kubebuilder:printcolumn:name="Power",type=string,JSONPath=`.status.power.status`
 // +kubebuilder:printcolumn:name="Nodes",type=integer,JSONPath=`.status.cluster.nodeCount`
 // +kubebuilder:printcolumn:name="Cert Days",type=integer,JSONPath=`.status.cluster.certificateRemainingDays`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`

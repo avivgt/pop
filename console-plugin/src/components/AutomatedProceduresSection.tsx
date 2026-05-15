@@ -15,41 +15,54 @@ import {
   EmptyStateBody,
   Alert,
   Title,
+  TextInput,
+  ExpandableSection,
 } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import {
   CheckCircleIcon,
   ExclamationCircleIcon,
+  PluggedIcon,
+  UnpluggedIcon,
 } from '@patternfly/react-icons';
-import { k8sCreate } from '@openshift-console/dynamic-plugin-sdk';
+import { k8sCreate, k8sPatch } from '@openshift-console/dynamic-plugin-sdk';
 import {
-  ClusterLifecycleConfigResource,
+  AutomatedProceduresConfigResource,
   PowerEventResource,
 } from '../types';
-import { PowerEventModel } from '../models';
+import { AutomatedProceduresConfigModel, PowerEventModel } from '../models';
 import { formatTimestamp } from '../utils';
 import PhaseLabel from './shared/PhaseLabel';
 
-interface PowerSectionProps {
-  config: ClusterLifecycleConfigResource | undefined;
+interface AutomatedProceduresSectionProps {
+  apConfig: AutomatedProceduresConfigResource | undefined;
   powerEvents: PowerEventResource[];
   powerEventsLoaded: boolean;
   namespace: string;
 }
 
-const PowerSection: React.FC<PowerSectionProps> = ({
-  config,
+const AutomatedProceduresSection: React.FC<AutomatedProceduresSectionProps> = ({
+  apConfig,
   powerEvents,
   powerEventsLoaded,
   namespace,
 }) => {
   const [testError, setTestError] = React.useState<string | undefined>(undefined);
   const [isTesting, setIsTesting] = React.useState(false);
+  const [batteryMinutes, setBatteryMinutes] = React.useState<number | undefined>(undefined);
+  const [batterySaving, setBatterySaving] = React.useState(false);
+  const [sourcesExpanded, setSourcesExpanded] = React.useState(false);
 
-  const powerConfig = config?.spec?.powerProtection;
-  const powerStatus = config?.status?.power;
-  const isEnabled = powerConfig?.enabled ?? false;
-  const currentStatus = powerStatus?.status || 'Unknown';
+  const spec = apConfig?.spec;
+  const status = apConfig?.status;
+  const currentBattery = spec?.batteryCapacityMinutes ?? 15;
+
+  React.useEffect(() => {
+    setBatteryMinutes(currentBattery);
+  }, [currentBattery]);
+
+  const isEnabled = spec?.enabled ?? false;
+  const currentStatus = status?.powerStatus || 'Unknown';
   const isNormal = currentStatus === 'Normal';
 
   const sortedEvents = [...(powerEvents || [])]
@@ -59,6 +72,26 @@ const PowerSection: React.FC<PowerSectionProps> = ({
       return bTime - aTime;
     })
     .slice(0, 5);
+
+  const batteryChanged = batteryMinutes !== currentBattery;
+
+  const handleSaveBattery = () => {
+    if (!apConfig || batteryMinutes == null) return;
+    setBatterySaving(true);
+    k8sPatch({
+      model: AutomatedProceduresConfigModel,
+      resource: apConfig,
+      data: [
+        {
+          op: 'replace',
+          path: '/spec/batteryCapacityMinutes',
+          value: batteryMinutes,
+        },
+      ],
+    })
+      .then(() => setBatterySaving(false))
+      .catch(() => setBatterySaving(false));
+  };
 
   const handleTestAlert = () => {
     setIsTesting(true);
@@ -82,14 +115,14 @@ const PowerSection: React.FC<PowerSectionProps> = ({
         },
       },
     })
-      .then(() => {
-        setIsTesting(false);
-      })
+      .then(() => setIsTesting(false))
       .catch((err: Error) => {
         setIsTesting(false);
         setTestError(err.message || 'Failed to create test alert');
       });
   };
+
+  const eventSources = status?.eventSources || [];
 
   return (
     <Card>
@@ -99,7 +132,7 @@ const PowerSection: React.FC<PowerSectionProps> = ({
           spaceItems={{ default: 'spaceItemsMd' }}
         >
           <FlexItem>
-            <Title headingLevel="h2">Power Protection</Title>
+            <Title headingLevel="h2">Automated Procedures</Title>
           </FlexItem>
           <FlexItem>
             <Label
@@ -113,11 +146,10 @@ const PowerSection: React.FC<PowerSectionProps> = ({
       </CardTitle>
       <CardBody>
         <div style={{ marginBottom: 16, color: '#6a6e73', fontSize: '0.9rem', lineHeight: 1.6 }}>
-          Automated emergency response for power outages. When a UPS or PDU sends a power failure
-          alert to the webhook endpoint, the system immediately backs up etcd, waits for a
-          confirmation period (in case power returns), then gracefully shuts down the cluster
-          based on priority. If power is restored at any point before shutdown, the process cancels
-          and the backup is preserved.
+          Automated event response for power outages and infrastructure events. Event sources
+          (webhook, SNMP, IPMI/Redfish, NUT) detect power failures and trigger etcd backup,
+          wait for a confirmation period, then gracefully shut down the cluster if power is
+          not restored.
         </div>
 
         <Flex spaceItems={{ default: 'spaceItemsLg' }} style={{ marginBottom: 16 }}>
@@ -137,19 +169,43 @@ const PowerSection: React.FC<PowerSectionProps> = ({
               <DescriptionListGroup>
                 <DescriptionListTerm>Priority</DescriptionListTerm>
                 <DescriptionListDescription>
-                  {powerConfig?.clusterPriority || 'Standard'}
+                  {spec?.clusterPriority || 'Standard'}
                 </DescriptionListDescription>
               </DescriptionListGroup>
               <DescriptionListGroup>
-                <DescriptionListTerm>Battery</DescriptionListTerm>
+                <DescriptionListTerm>Battery (min)</DescriptionListTerm>
                 <DescriptionListDescription>
-                  {powerConfig?.batteryCapacityMinutes ?? 15} min
+                  <Flex alignItems={{ default: 'alignItemsCenter' }} spaceItems={{ default: 'spaceItemsSm' }}>
+                    <FlexItem>
+                      <TextInput
+                        type="number"
+                        value={String(batteryMinutes ?? '')}
+                        onChange={(_e, val) => setBatteryMinutes(val === '' ? undefined : Number(val))}
+                        style={{ width: 80 }}
+                        min={1}
+                        aria-label="Battery capacity in minutes"
+                      />
+                    </FlexItem>
+                    {batteryChanged && (
+                      <FlexItem>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={handleSaveBattery}
+                          isLoading={batterySaving}
+                          isDisabled={batterySaving || batteryMinutes == null || batteryMinutes < 1}
+                        >
+                          Save
+                        </Button>
+                      </FlexItem>
+                    )}
+                  </Flex>
                 </DescriptionListDescription>
               </DescriptionListGroup>
               <DescriptionListGroup>
                 <DescriptionListTerm>Autonomous</DescriptionListTerm>
                 <DescriptionListDescription>
-                  {powerConfig?.autonomousShutdown ? 'Yes' : 'No'}
+                  {spec?.autonomousShutdown ? 'Yes' : 'No'}
                 </DescriptionListDescription>
               </DescriptionListGroup>
             </DescriptionList>
@@ -175,6 +231,41 @@ const PowerSection: React.FC<PowerSectionProps> = ({
           >
             {testError}
           </Alert>
+        )}
+
+        {eventSources.length > 0 && (
+          <ExpandableSection
+            toggleText={`Event Sources (${eventSources.length})`}
+            isExpanded={sourcesExpanded}
+            onToggle={(_e, expanded) => setSourcesExpanded(expanded)}
+            style={{ marginBottom: 16 }}
+          >
+            <DescriptionList isCompact isHorizontal>
+              {eventSources.map((src) => (
+                <DescriptionListGroup key={src.type}>
+                  <DescriptionListTerm>{src.type.toUpperCase()}</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    <Flex alignItems={{ default: 'alignItemsCenter' }} spaceItems={{ default: 'spaceItemsSm' }}>
+                      <FlexItem>
+                        <Label
+                          color={src.connected ? 'green' : 'red'}
+                          icon={src.connected ? <PluggedIcon /> : <UnpluggedIcon />}
+                        >
+                          {src.connected ? 'Connected' : 'Disconnected'}
+                        </Label>
+                      </FlexItem>
+                      {src.message && <FlexItem>{src.message}</FlexItem>}
+                      {src.lastCheck && (
+                        <FlexItem style={{ color: '#6a6e73', fontSize: '0.85rem' }}>
+                          checked {formatTimestamp(src.lastCheck)}
+                        </FlexItem>
+                      )}
+                    </Flex>
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+              ))}
+            </DescriptionList>
+          </ExpandableSection>
         )}
 
         <Title headingLevel="h3" style={{ marginBottom: 8 }}>
@@ -222,4 +313,4 @@ const PowerSection: React.FC<PowerSectionProps> = ({
   );
 };
 
-export default PowerSection;
+export default AutomatedProceduresSection;
