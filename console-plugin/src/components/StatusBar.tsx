@@ -12,19 +12,20 @@ import {
   OutlinedClockIcon,
   ServerIcon,
 } from '@patternfly/react-icons';
-import { ClusterLifecycleConfigResource } from '../types';
+import { ClusterLifecycleConfigResource, AutomatedProceduresConfigResource } from '../types';
 
 interface StatusBarProps {
   config: ClusterLifecycleConfigResource | undefined;
+  apConfig?: AutomatedProceduresConfigResource;
   loaded: boolean;
 }
 
-const StatusBar: React.FC<StatusBarProps> = ({ config, loaded }) => {
+const StatusBar: React.FC<StatusBarProps> = ({ config, apConfig, loaded }) => {
   if (!loaded || !config) {
     return null;
   }
 
-  const powerStatus = config.status?.power?.status || 'Unknown';
+  const powerStatus = apConfig?.status?.powerStatus || 'Unknown';
   const isNormalPower = powerStatus === 'Normal';
   const certDays = config.status?.cluster?.certificateRemainingDays;
   const nodeCount = config.status?.cluster?.nodeCount;
@@ -39,59 +40,38 @@ const StatusBar: React.FC<StatusBarProps> = ({ config, loaded }) => {
           alignItems={{ default: 'alignItemsCenter' }}
         >
           <FlexItem>
-            <Flex
-              spaceItems={{ default: 'spaceItemsSm' }}
-              alignItems={{ default: 'alignItemsCenter' }}
+            <Label
+              color={isNormalPower ? 'green' : 'red'}
+              icon={isNormalPower ? <CheckCircleIcon /> : <ExclamationCircleIcon />}
             >
-              <FlexItem>
-                <Label
-                  color={isNormalPower ? 'green' : 'red'}
-                  icon={isNormalPower ? <CheckCircleIcon /> : <ExclamationCircleIcon />}
-                >
-                  Power: {powerStatus}
-                </Label>
-              </FlexItem>
-            </Flex>
+              Power: {powerStatus}
+            </Label>
           </FlexItem>
 
           <FlexItem>
-            <Flex
-              spaceItems={{ default: 'spaceItemsSm' }}
-              alignItems={{ default: 'alignItemsCenter' }}
+            <Label
+              color={
+                certDays !== undefined
+                  ? certDays > 30
+                    ? 'green'
+                    : certDays > 7
+                    ? 'orange'
+                    : 'red'
+                  : 'grey'
+              }
+              icon={<OutlinedClockIcon />}
             >
-              <FlexItem>
-                <Label
-                  color={
-                    certDays !== undefined
-                      ? certDays > 30
-                        ? 'green'
-                        : certDays > 7
-                        ? 'orange'
-                        : 'red'
-                      : 'grey'
-                  }
-                  icon={<OutlinedClockIcon />}
-                >
-                  Cert: {certDays !== undefined ? `${certDays} days` : 'N/A'}
-                </Label>
-              </FlexItem>
-            </Flex>
+              Cert: {certDays !== undefined ? `${certDays} days` : 'N/A'}
+            </Label>
           </FlexItem>
 
           <FlexItem>
-            <Flex
-              spaceItems={{ default: 'spaceItemsSm' }}
-              alignItems={{ default: 'alignItemsCenter' }}
-            >
-              <FlexItem>
-                <Label color="blue" icon={<ServerIcon />}>
-                  Nodes: {nodeCount !== undefined ? nodeCount : 'N/A'}
-                  {controlPlaneNodes !== undefined && workerNodes !== undefined
-                    ? ` (${controlPlaneNodes} CP / ${workerNodes} W)`
-                    : ''}
-                </Label>
-              </FlexItem>
-            </Flex>
+            <Label color="blue" icon={<ServerIcon />}>
+              Nodes: {nodeCount !== undefined ? nodeCount : 'N/A'}
+              {controlPlaneNodes !== undefined && workerNodes !== undefined
+                ? ` (${controlPlaneNodes} CP / ${workerNodes} W)`
+                : ''}
+            </Label>
           </FlexItem>
         </Flex>
       </CardBody>

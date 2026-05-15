@@ -121,6 +121,19 @@ lint: golangci-lint ## Run golangci-lint linter
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
+.PHONY: lint-watches
+lint-watches: ## Check that dashboard pages don't use excessive K8s list watches.
+	@echo "Checking console plugin watch usage..."
+	@for page in console-plugin/src/components/DashboardPage.tsx; do \
+		count=$$(grep -c 'isList: true' $$page 2>/dev/null || echo 0); \
+		if [ "$$count" -gt 1 ]; then \
+			echo "ERROR: $$page has $$count list watches (max 1). Use status fields on singleton CRDs instead."; \
+			exit 1; \
+		fi; \
+		echo "  $$page: $$count list watch(es) — OK"; \
+	done
+	@echo "Watch usage check passed."
+
 ##@ Build
 
 .PHONY: build

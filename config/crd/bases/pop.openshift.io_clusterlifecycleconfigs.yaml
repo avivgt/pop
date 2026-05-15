@@ -21,9 +21,6 @@ spec:
     - jsonPath: .status.backup.lastBackupTime
       name: Last Backup
       type: date
-    - jsonPath: .status.power.status
-      name: Power
-      type: string
     - jsonPath: .status.cluster.nodeCount
       name: Nodes
       type: integer
@@ -286,66 +283,6 @@ spec:
                     - enabled
                     type: object
                 type: object
-              powerProtection:
-                description: PowerProtection configures UPS/PSU-driven power protection.
-                properties:
-                  alertEndpoint:
-                    description: AlertEndpoint configures the PSU webhook receiver.
-                    properties:
-                      authTokenSecret:
-                        description: |-
-                          AuthTokenSecret is the name of a Secret containing a "token" key
-                          used for bearer token authentication on the alert endpoint.
-                        type: string
-                      port:
-                        default: 8082
-                        description: Port is the HTTP port for the PSU alert webhook
-                          receiver.
-                        format: int32
-                        maximum: 65535
-                        minimum: 1024
-                        type: integer
-                    type: object
-                  autonomousShutdown:
-                    default: false
-                    description: AutonomousShutdown auto-shuts down after confirmation
-                      + priority delay.
-                    type: boolean
-                  batteryCapacityMinutes:
-                    default: 15
-                    description: BatteryCapacityMinutes is the expected UPS battery
-                      duration.
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  clusterPriority:
-                    default: Standard
-                    description: ClusterPriority determines shutdown delay tier.
-                    enum:
-                    - Critical
-                    - Standard
-                    - BestEffort
-                    type: string
-                  enabled:
-                    default: false
-                    description: Enabled activates UPS/PSU power protection.
-                    type: boolean
-                  managementURL:
-                    description: |-
-                      ManagementURL is the URL of the UPS/PDU management interface
-                      (e.g. "https://192.168.1.100" for an APC, Eaton, or Redfish endpoint).
-                      Used for display in the dashboard and future health-checking.
-                    type: string
-                  powerConfirmationSeconds:
-                    default: 120
-                    description: PowerConfirmationSeconds is the wait before confirming
-                      an outage.
-                    format: int32
-                    minimum: 10
-                    type: integer
-                required:
-                - enabled
-                type: object
               shutdown:
                 description: Shutdown configures cluster shutdown defaults.
                 properties:
@@ -517,25 +454,6 @@ spec:
                   - type
                   type: object
                 type: array
-              power:
-                description: Power summarizes power protection status.
-                properties:
-                  activeEvent:
-                    description: ActiveEvent is the name of the current active PowerEvent.
-                    type: string
-                  alertEndpointReady:
-                    description: AlertEndpointReady indicates the webhook server is
-                      running.
-                    type: boolean
-                  lastEventTime:
-                    description: LastEventTime is the timestamp of the last power
-                      event.
-                    format: date-time
-                    type: string
-                  status:
-                    description: Status is the current power state.
-                    type: string
-                type: object
             type: object
         type: object
     served: true
