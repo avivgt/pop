@@ -79,6 +79,7 @@ const ClusterShutdownList: React.FC = () => {
               <Tr>
                 <Th>Name</Th>
                 <Th>Phase</Th>
+                <Th>Reason</Th>
                 <Th>DryRun</Th>
                 <Th>Nodes</Th>
                 <Th>Shutdown Count</Th>
@@ -92,6 +93,7 @@ const ClusterShutdownList: React.FC = () => {
                   <Td dataLabel="Phase">
                     <PhaseLabel phase={shutdown.status?.phase} />
                   </Td>
+                  <Td dataLabel="Reason">{shutdown.spec?.reason || '-'}</Td>
                   <Td dataLabel="DryRun">
                     {shutdown.spec?.dryRun !== undefined
                       ? String(shutdown.spec.dryRun)

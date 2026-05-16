@@ -33,8 +33,8 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
   const isTest = mode === 'test';
 
   const handleSubmit = () => {
-    if (!reason.trim()) {
-      setError('A reason is required.');
+    if (!isTest && !reason.trim()) {
+      setError('A reason is required for cluster shutdown.');
       return;
     }
 
@@ -89,7 +89,7 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
           variant={isTest ? 'primary' : 'danger'}
           onClick={handleSubmit}
           isLoading={isSubmitting}
-          isDisabled={isSubmitting || !reason.trim()}
+          isDisabled={isSubmitting || (!isTest && !reason.trim())}
         >
           {isTest ? 'Run Test' : 'Shutdown Cluster'}
         </Button>,
@@ -116,13 +116,12 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
             All nodes will be cordoned and powered off. This action cannot be undone from the console.
           </Alert>
         )}
-        <FormGroup label="Reason" isRequired fieldId="shutdown-reason" style={{ marginTop: 16 }}>
+        <FormGroup label="Reason" isRequired={!isTest} fieldId="shutdown-reason" style={{ marginTop: 16 }}>
           <TextInput
             id="shutdown-reason"
             value={reason}
             onChange={(_event, value) => setReason(value)}
-            placeholder={isTest ? 'e.g. Pre-maintenance validation' : 'e.g. Scheduled maintenance window'}
-            isRequired
+            placeholder={isTest ? 'e.g. Pre-maintenance validation (optional)' : 'e.g. Scheduled maintenance window'}
           />
         </FormGroup>
       </Form>
