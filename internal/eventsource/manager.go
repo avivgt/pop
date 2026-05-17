@@ -116,6 +116,26 @@ func (m *Manager) stopAll() {
 }
 
 func createPowerEvent(ctx context.Context, k8sClient client.Client, namespace string, source string, eventType popv1alpha1.PowerEventType, message string) error {
+	if eventType == popv1alpha1.PowerEventTypeFailure {
+		existing := &popv1alpha1.PowerEventList{}
+		if err := k8sClient.List(ctx, existing, client.InNamespace(namespace)); err == nil {
+			for i := range existing.Items {
+				e := &existing.Items[i]
+				if e.Spec.EventType != popv1alpha1.PowerEventTypeFailure {
+					continue
+				}
+				switch e.Status.Phase {
+				case popv1alpha1.PowerEventPhaseDetected,
+					popv1alpha1.PowerEventPhaseBackingUp,
+					popv1alpha1.PowerEventPhaseAwaitingConfirmation,
+					popv1alpha1.PowerEventPhaseConfirmed,
+					popv1alpha1.PowerEventPhaseShuttingDown:
+					return nil
+				}
+			}
+		}
+	}
+
 	event := &popv1alpha1.PowerEvent{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: source + "-",

@@ -8,8 +8,8 @@ import {
   Alert,
 } from '@patternfly/react-core';
 import { useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
-import { ClusterLifecycleConfigModel } from '../models';
-import { ClusterLifecycleConfigResource } from '../types';
+import { ClusterLifecycleConfigModel, AutomatedProceduresConfigModel } from '../models';
+import { ClusterLifecycleConfigResource, AutomatedProceduresConfigResource } from '../types';
 import SettingsSection from './SettingsSection';
 
 const NAMESPACE = 'pop-system';
@@ -20,6 +20,17 @@ const SettingsPage: React.FC = () => {
       group: ClusterLifecycleConfigModel.apiGroup,
       version: ClusterLifecycleConfigModel.apiVersion,
       kind: ClusterLifecycleConfigModel.kind,
+    },
+    namespace: NAMESPACE,
+    name: 'default',
+    namespaced: true,
+  });
+
+  const [apConfig, , apConfigError] = useK8sWatchResource<AutomatedProceduresConfigResource>({
+    groupVersionKind: {
+      group: AutomatedProceduresConfigModel.apiGroup,
+      version: AutomatedProceduresConfigModel.apiVersion,
+      kind: AutomatedProceduresConfigModel.kind,
     },
     namespace: NAMESPACE,
     name: 'default',
@@ -42,22 +53,25 @@ const SettingsPage: React.FC = () => {
     );
   }
 
+  const hasError = configError || apConfigError;
+
   return (
     <>
       <PageSection variant="light">
         <Title headingLevel="h1">Settings</Title>
       </PageSection>
 
-      {configError && (
+      {hasError && (
         <PageSection>
-          <Alert variant="warning" isInline title="Configuration could not be loaded">
-            <p>{String(configError)}</p>
+          <Alert variant="warning" isInline title="Some configuration could not be loaded">
+            {configError && <p>Lifecycle Config: {String(configError)}</p>}
+            {apConfigError && <p>Automated Procedures: {String(apConfigError)}</p>}
           </Alert>
         </PageSection>
       )}
 
       <PageSection>
-        <SettingsSection config={config} namespace={NAMESPACE} />
+        <SettingsSection config={config} apConfig={apConfig} namespace={NAMESPACE} />
       </PageSection>
     </>
   );
