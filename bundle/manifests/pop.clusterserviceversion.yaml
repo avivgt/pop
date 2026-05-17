@@ -6,6 +6,53 @@ metadata:
       [
         {
           "apiVersion": "pop.openshift.io/v1alpha1",
+          "kind": "AutomatedProceduresConfig",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "pop"
+            },
+            "name": "default",
+            "namespace": "pop-system"
+          },
+          "spec": {
+            "alertEndpoint": {
+              "authTokenSecret": "psu-alert-token",
+              "port": 8082
+            },
+            "autonomousShutdown": true,
+            "backupConfig": {
+              "pvcName": "etcd-backup-storage",
+              "shutdownDelayMinutes": 1
+            },
+            "batteryCapacityMinutes": 15,
+            "clusterPriority": "Standard",
+            "enabled": true,
+            "eventSources": {
+              "webhook": {
+                "port": 8082
+              }
+            },
+            "notification": {
+              "alertmanager": {
+                "enabled": true
+              },
+              "kubernetesEvents": {
+                "enabled": true
+              },
+              "smtp": {
+                "enabled": false
+              },
+              "webhook": {
+                "enabled": true,
+                "url": "https://hooks.slack.com/services/REPLACE_ME"
+              }
+            },
+            "powerConfirmationSeconds": 120
+          }
+        },
+        {
+          "apiVersion": "pop.openshift.io/v1alpha1",
           "kind": "BackupSchedule",
           "metadata": {
             "labels": {
@@ -17,11 +64,51 @@ metadata:
           },
           "spec": {
             "backupTimeoutMinutes": 15,
+            "frequency": "Daily",
             "pvcName": "etcd-backup-storage",
             "retentionCount": 10,
             "retentionDays": 30,
-            "schedule": "0 2 * * *",
-            "suspend": false
+            "suspend": false,
+            "time": "02:00"
+          }
+        },
+        {
+          "apiVersion": "pop.openshift.io/v1alpha1",
+          "kind": "ClusterLifecycleConfig",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "pop"
+            },
+            "name": "default",
+            "namespace": "pop-system"
+          },
+          "spec": {
+            "backup": {
+              "retention": {
+                "count": 10,
+                "days": 30
+              },
+              "schedule": {
+                "enabled": true,
+                "frequency": "Daily",
+                "time": "02:00"
+              },
+              "storage": {
+                "pvcName": "etcd-backup-storage"
+              },
+              "timeoutMinutes": 15
+            },
+            "notification": {
+              "kubernetesEvents": {
+                "enabled": true
+              }
+            },
+            "shutdown": {
+              "cordonNodes": true,
+              "defaultDelayMinutes": 1,
+              "notifyApplications": true
+            }
           }
         },
         {
@@ -120,48 +207,6 @@ metadata:
         },
         {
           "apiVersion": "pop.openshift.io/v1alpha1",
-          "kind": "PowerProtectionConfig",
-          "metadata": {
-            "labels": {
-              "app.kubernetes.io/managed-by": "kustomize",
-              "app.kubernetes.io/name": "pop"
-            },
-            "name": "default",
-            "namespace": "pop-system"
-          },
-          "spec": {
-            "alertEndpoint": {
-              "authTokenSecret": "psu-alert-token",
-              "port": 8082
-            },
-            "autonomousShutdown": true,
-            "backupConfig": {
-              "pvcName": "etcd-backup-storage",
-              "shutdownDelayMinutes": 1
-            },
-            "batteryCapacityMinutes": 15,
-            "clusterPriority": "Standard",
-            "enabled": true,
-            "notification": {
-              "alertmanager": {
-                "enabled": true
-              },
-              "kubernetesEvents": {
-                "enabled": true
-              },
-              "smtp": {
-                "enabled": false
-              },
-              "webhook": {
-                "enabled": true,
-                "url": "https://hooks.slack.com/services/REPLACE_ME"
-              }
-            },
-            "powerConfirmationSeconds": 120
-          }
-        },
-        {
-          "apiVersion": "pop.openshift.io/v1alpha1",
           "kind": "WorkloadEvacuation",
           "metadata": {
             "labels": {
@@ -203,19 +248,29 @@ metadata:
       ]
     capabilities: Basic Install
     console.openshift.io/plugins: '["pop-console-plugin"]'
-    createdAt: "2026-04-18T10:20:11Z"
+    createdAt: "2026-05-17T16:26:37Z"
     operators.operatorframework.io/builder: operator-sdk-v1.39.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-  name: pop.v0.1.0
+  name: pop.v0.2.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - kind: AutomatedProceduresConfig
+      name: automatedproceduresconfigs.pop.openshift.io
+      version: v1alpha1
     - description: BackupSchedule creates EtcdBackup CRs on a cron schedule with retention.
       displayName: Backup Schedule
       kind: BackupSchedule
       name: backupschedules.pop.openshift.io
+      version: v1alpha1
+    - description: |-
+        ClusterLifecycleConfig is the single configuration for POP cluster lifecycle management.
+        Create one instance named "default" in the operator namespace.
+      displayName: Cluster Lifecycle Config
+      kind: ClusterLifecycleConfig
+      name: clusterlifecycleconfigs.pop.openshift.io
       version: v1alpha1
     - description: |-
         ClusterRestart orchestrates bringing an OpenShift cluster back up
@@ -243,12 +298,6 @@ spec:
       displayName: Power Event
       kind: PowerEvent
       name: powerevents.pop.openshift.io
-      version: v1alpha1
-    - description: PowerProtectionConfig configures UPS/PSU-driven power protection
-        for the cluster.
-      displayName: Power Protection Config
-      kind: PowerProtectionConfig
-      name: powerprotectionconfigs.pop.openshift.io
       version: v1alpha1
     - description: |-
         WorkloadEvacuation requests ACM to migrate workloads away from this cluster,
@@ -279,7 +328,9 @@ spec:
           verbs:
           - create
           - get
+          - list
           - update
+          - watch
         - apiGroups:
           - ""
           resources:
@@ -317,6 +368,12 @@ spec:
           - get
           - list
           - watch
+        - apiGroups:
+          - ""
+          resources:
+          - pods/log
+          verbs:
+          - get
         - apiGroups:
           - apps
           resources:
@@ -373,12 +430,13 @@ spec:
         - apiGroups:
           - pop.openshift.io
           resources:
+          - automatedproceduresconfigs
           - backupschedules
+          - clusterlifecycleconfigs
           - clusterrestarts
           - clustershutdowns
           - etcdbackups
           - powerevents
-          - powerprotectionconfigs
           - workloadevacuations
           verbs:
           - create
@@ -391,24 +449,26 @@ spec:
         - apiGroups:
           - pop.openshift.io
           resources:
+          - automatedproceduresconfigs/finalizers
           - backupschedules/finalizers
+          - clusterlifecycleconfigs/finalizers
           - clusterrestarts/finalizers
           - clustershutdowns/finalizers
           - etcdbackups/finalizers
           - powerevents/finalizers
-          - powerprotectionconfigs/finalizers
           - workloadevacuations/finalizers
           verbs:
           - update
         - apiGroups:
           - pop.openshift.io
           resources:
+          - automatedproceduresconfigs/status
           - backupschedules/status
+          - clusterlifecycleconfigs/status
           - clusterrestarts/status
           - clustershutdowns/status
           - etcdbackups/status
           - powerevents/status
-          - powerprotectionconfigs/status
           - workloadevacuations/status
           verbs:
           - get
@@ -453,7 +513,7 @@ spec:
                 - --health-probe-bind-address=:8081
                 command:
                 - /manager
-                image: image-registry.openshift-image-registry.svc:5000/pop-system/pop-operator:v0.1.1
+                image: controller:latest
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -470,10 +530,10 @@ spec:
                 resources:
                   limits:
                     cpu: 500m
-                    memory: 128Mi
+                    memory: 512Mi
                   requests:
                     cpu: 10m
-                    memory: 64Mi
+                    memory: 128Mi
                 securityContext:
                   allowPrivilegeEscalation: false
                   capabilities:
@@ -538,6 +598,8 @@ spec:
   - email: avivgt@redhat.com
     name: Aviv GT
   maturity: alpha
+  minKubeVersion: 1.28.0
   provider:
     name: POP Project
-  version: 0.1.0
+  replaces: pop.v0.1.0
+  version: 0.2.0

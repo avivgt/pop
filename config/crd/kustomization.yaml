@@ -6,7 +6,7 @@ resources:
 - bases/pop.openshift.io_clustershutdowns.yaml
 - bases/pop.openshift.io_backupschedules.yaml
 - bases/pop.openshift.io_clusterrestarts.yaml
-- bases/pop.openshift.io_powerprotectionconfigs.yaml
+- bases/pop.openshift.io_automatedproceduresconfigs.yaml
 - bases/pop.openshift.io_powerevents.yaml
 - bases/pop.openshift.io_workloadevacuations.yaml
 - bases/pop.openshift.io_clusterlifecycleconfigs.yaml
@@ -23,7 +23,7 @@ patches:
 #- path: patches/cainjection_in_clustershutdowns.yaml
 #- path: patches/cainjection_in_backupschedules.yaml
 #- path: patches/cainjection_in_clusterrestarts.yaml
-#- path: patches/cainjection_in_powerprotectionconfigs.yaml
+#- path: patches/cainjection_in_automatedproceduresconfigs.yaml
 #- path: patches/cainjection_in_powerevents.yaml
 #- path: patches/cainjection_in_workloadevacuations.yaml
 #- path: patches/cainjection_in_clusterlifecycleconfigs.yaml

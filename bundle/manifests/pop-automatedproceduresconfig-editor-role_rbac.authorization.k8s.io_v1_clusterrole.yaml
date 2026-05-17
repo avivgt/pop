@@ -5,12 +5,12 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: pop
-  name: pop-powerprotectionconfig-editor-role
+  name: pop-automatedproceduresconfig-editor-role
 rules:
 - apiGroups:
   - pop.openshift.io
   resources:
-  - powerprotectionconfigs
+  - automatedproceduresconfigs
   verbs:
   - create
   - delete
@@ -22,6 +22,6 @@ rules:
 - apiGroups:
   - pop.openshift.io
   resources:
-  - powerprotectionconfigs/status
+  - automatedproceduresconfigs/status
   verbs:
   - get

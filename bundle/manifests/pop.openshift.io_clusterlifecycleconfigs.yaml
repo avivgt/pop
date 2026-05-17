@@ -1,0 +1,468 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.1
+  creationTimestamp: null
+  name: clusterlifecycleconfigs.pop.openshift.io
+spec:
+  group: pop.openshift.io
+  names:
+    kind: ClusterLifecycleConfig
+    listKind: ClusterLifecycleConfigList
+    plural: clusterlifecycleconfigs
+    singular: clusterlifecycleconfig
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.backup.resolvedSchedule
+      name: Schedule
+      type: string
+    - jsonPath: .status.backup.lastBackupTime
+      name: Last Backup
+      type: date
+    - jsonPath: .status.cluster.nodeCount
+      name: Nodes
+      type: integer
+    - jsonPath: .status.cluster.certificateRemainingDays
+      name: Cert Days
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          ClusterLifecycleConfig is the single configuration for POP cluster lifecycle management.
+          Create one instance named "default" in the operator namespace.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ClusterLifecycleConfigSpec is the single configuration for
+              all POP features.
+            properties:
+              backup:
+                description: Backup configures etcd backup storage, scheduling, and
+                  retention.
+                properties:
+                  retention:
+                    description: Retention configures backup cleanup policy.
+                    properties:
+                      count:
+                        default: 10
+                        description: Count is the maximum number of completed backups
+                          to keep.
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      days:
+                        default: 30
+                        description: Days is the maximum age of backups in days.
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    type: object
+                  schedule:
+                    description: Schedule configures automatic backup timing.
+                    properties:
+                      customInterval:
+                        description: CustomInterval for Custom frequency.
+                        properties:
+                          every:
+                            description: Every is the interval value.
+                            format: int32
+                            minimum: 1
+                            type: integer
+                          unit:
+                            description: Unit is the interval unit.
+                            enum:
+                            - Minutes
+                            - Hours
+                            - Days
+                            type: string
+                        required:
+                        - every
+                        - unit
+                        type: object
+                      dayOfMonth:
+                        description: DayOfMonth for Monthly frequency (1-28).
+                        format: int32
+                        maximum: 28
+                        minimum: 1
+                        type: integer
+                      dayOfWeek:
+                        description: DayOfWeek for Weekly frequency.
+                        enum:
+                        - Sunday
+                        - Monday
+                        - Tuesday
+                        - Wednesday
+                        - Thursday
+                        - Friday
+                        - Saturday
+                        type: string
+                      enabled:
+                        default: true
+                        description: Enabled activates automatic scheduled backups.
+                        type: boolean
+                      frequency:
+                        default: Daily
+                        description: Frequency is the backup frequency preset.
+                        enum:
+                        - Every4Hours
+                        - Every8Hours
+                        - Every12Hours
+                        - Daily
+                        - Weekly
+                        - Monthly
+                        - Custom
+                        type: string
+                      time:
+                        default: "02:00"
+                        description: Time is the time of day in HH:MM format (UTC).
+                        pattern: ^([01]\d|2[0-3]):[0-5]\d$
+                        type: string
+                    required:
+                    - enabled
+                    type: object
+                  storage:
+                    description: Storage defines where backups are stored.
+                    properties:
+                      exportTarget:
+                        description: ExportTarget optionally configures S3 export.
+                        properties:
+                          s3:
+                            description: S3 is required when Type is S3.
+                            properties:
+                              bucket:
+                                description: Bucket is the S3 bucket name.
+                                minLength: 1
+                                type: string
+                              credentialsSecret:
+                                description: CredentialsSecret is the name of a Secret
+                                  containing "access-key" and "secret-key".
+                                minLength: 1
+                                type: string
+                              endpoint:
+                                description: Endpoint is the S3-compatible endpoint
+                                  URL (for MinIO, ODF, etc.).
+                                type: string
+                              prefix:
+                                description: Prefix is a path prefix within the bucket.
+                                type: string
+                              region:
+                                default: us-east-1
+                                description: Region is the AWS region.
+                                type: string
+                            required:
+                            - bucket
+                            - credentialsSecret
+                            type: object
+                          type:
+                            default: PVC
+                            description: Type is PVC or S3.
+                            enum:
+                            - PVC
+                            - S3
+                            type: string
+                        required:
+                        - type
+                        type: object
+                      pvcName:
+                        description: PVCName is the PVC for etcd backup storage.
+                        minLength: 1
+                        type: string
+                    required:
+                    - pvcName
+                    type: object
+                  timeoutMinutes:
+                    default: 15
+                    description: TimeoutMinutes is the maximum time for a backup job.
+                    format: int32
+                    maximum: 60
+                    minimum: 1
+                    type: integer
+                required:
+                - storage
+                type: object
+              notification:
+                description: Notification configures alert channels.
+                properties:
+                  alertmanager:
+                    description: Alertmanager configures Alertmanager push notifications.
+                    properties:
+                      enabled:
+                        default: false
+                        description: Enabled activates Alertmanager notifications.
+                        type: boolean
+                      url:
+                        description: |-
+                          URL is the Alertmanager API endpoint.
+                          Defaults to the cluster's built-in Alertmanager if empty.
+                        type: string
+                    required:
+                    - enabled
+                    type: object
+                  kubernetesEvents:
+                    description: KubernetesEvents configures K8s Event emission.
+                    properties:
+                      enabled:
+                        default: true
+                        description: Enabled activates Kubernetes Event emission.
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                  smtp:
+                    description: SMTP configures email notifications.
+                    properties:
+                      credentialsSecret:
+                        description: CredentialsSecret is the name of a Secret with
+                          "username" and "password".
+                        type: string
+                      enabled:
+                        default: false
+                        description: Enabled activates SMTP email notifications.
+                        type: boolean
+                      from:
+                        description: From is the sender email address.
+                        type: string
+                      host:
+                        description: Host is the SMTP server hostname.
+                        type: string
+                      port:
+                        default: 587
+                        description: Port is the SMTP server port.
+                        format: int32
+                        type: integer
+                      to:
+                        description: To is the list of recipient email addresses.
+                        items:
+                          type: string
+                        type: array
+                      useTLS:
+                        default: true
+                        description: UseTLS enables STARTTLS.
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                  webhook:
+                    description: Webhook configures generic HTTP webhook notifications.
+                    properties:
+                      authSecret:
+                        description: |-
+                          AuthSecret is the name of a Secret containing an "authorization" key
+                          sent as the Authorization header.
+                        type: string
+                      enabled:
+                        default: false
+                        description: Enabled activates webhook notifications.
+                        type: boolean
+                      url:
+                        description: URL is the target for POST JSON notifications.
+                        type: string
+                    required:
+                    - enabled
+                    type: object
+                type: object
+              shutdown:
+                description: Shutdown configures cluster shutdown defaults.
+                properties:
+                  cordonNodes:
+                    default: true
+                    description: CordonNodes when true cordons all nodes before shutdown.
+                    type: boolean
+                  defaultDelayMinutes:
+                    default: 1
+                    description: |-
+                      DefaultDelayMinutes is the shutdown delay for worker nodes.
+                      Control plane nodes get double this value.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  notifyApplications:
+                    default: true
+                    description: NotifyApplications creates a ConfigMap signal before
+                      shutdown.
+                    type: boolean
+                  preShutdownHooks:
+                    description: PreShutdownHooks are Jobs to run before shutdown.
+                    items:
+                      properties:
+                        command:
+                          description: Command is the command to execute.
+                          items:
+                            type: string
+                          type: array
+                        image:
+                          description: Image is the container image to run.
+                          type: string
+                        name:
+                          description: Name is a human-readable identifier for this
+                            hook.
+                          type: string
+                        timeoutSeconds:
+                          default: 300
+                          description: TimeoutSeconds is the maximum time for this
+                            hook to complete.
+                          format: int32
+                          type: integer
+                      required:
+                      - command
+                      - image
+                      - name
+                      - timeoutSeconds
+                      type: object
+                    type: array
+                type: object
+            required:
+            - backup
+            type: object
+          status:
+            description: ClusterLifecycleConfigStatus is the observed state of the
+              cluster lifecycle.
+            properties:
+              backup:
+                description: Backup summarizes backup status.
+                properties:
+                  activeBackup:
+                    description: ActiveBackup is the name of the in-progress backup.
+                    type: string
+                  failedBackups:
+                    description: FailedBackups is the count of failed backups.
+                    format: int32
+                    type: integer
+                  lastBackupTime:
+                    description: LastBackupTime is when the most recent backup was
+                      triggered.
+                    format: date-time
+                    type: string
+                  lastSuccessfulBackup:
+                    description: LastSuccessfulBackup is the name of the last successful
+                      EtcdBackup.
+                    type: string
+                  nextBackupTime:
+                    description: NextBackupTime is when the next scheduled backup
+                      will run.
+                    format: date-time
+                    type: string
+                  resolvedSchedule:
+                    description: ResolvedSchedule is the human-readable schedule description.
+                    type: string
+                  totalBackups:
+                    description: TotalBackups is the total number of backups created.
+                    format: int32
+                    type: integer
+                type: object
+              cluster:
+                description: Cluster summarizes cluster health.
+                properties:
+                  certificateExpiry:
+                    description: CertificateExpiry is when the kube-apiserver cert
+                      expires.
+                    format: date-time
+                    type: string
+                  certificateRemainingDays:
+                    description: CertificateRemainingDays is days until cert expiry.
+                    format: int32
+                    type: integer
+                  controlPlaneNodes:
+                    description: ControlPlaneNodes is the control plane node count.
+                    format: int32
+                    type: integer
+                  nodeCount:
+                    description: NodeCount is the total node count.
+                    format: int32
+                    type: integer
+                  workerNodes:
+                    description: WorkerNodes is the worker node count.
+                    format: int32
+                    type: integer
+                type: object
+              conditions:
+                description: Conditions represent the latest observations.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: null
+  storedVersions: null

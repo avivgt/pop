@@ -15,7 +15,10 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.schedule
+    - jsonPath: .spec.frequency
+      name: Frequency
+      type: string
+    - jsonPath: .status.humanReadableSchedule
       name: Schedule
       type: string
     - jsonPath: .spec.suspend
@@ -60,6 +63,44 @@ spec:
                 maximum: 60
                 minimum: 1
                 type: integer
+              customInterval:
+                description: |-
+                  CustomInterval defines a custom repeat interval.
+                  Used when frequency is "Custom".
+                properties:
+                  every:
+                    description: Every is the interval value.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  unit:
+                    description: Unit is the interval unit.
+                    enum:
+                    - Minutes
+                    - Hours
+                    - Days
+                    type: string
+                required:
+                - every
+                - unit
+                type: object
+              dayOfMonth:
+                description: DayOfMonth is the day for Monthly frequency (1-28).
+                format: int32
+                maximum: 28
+                minimum: 1
+                type: integer
+              dayOfWeek:
+                description: DayOfWeek is the day for Weekly frequency.
+                enum:
+                - Sunday
+                - Monday
+                - Tuesday
+                - Wednesday
+                - Thursday
+                - Friday
+                - Saturday
+                type: string
               exportTarget:
                 description: ExportTarget optionally configures S3 export for scheduled
                   backups.
@@ -101,6 +142,22 @@ spec:
                 required:
                 - type
                 type: object
+              frequency:
+                default: Daily
+                description: |-
+                  Frequency is the backup frequency preset.
+                  Use "Now" to trigger an immediate backup, then continue on the next preset.
+                  Use "Custom" with customInterval for non-standard intervals.
+                enum:
+                - Now
+                - Every4Hours
+                - Every8Hours
+                - Every12Hours
+                - Daily
+                - Weekly
+                - Monthly
+                - Custom
+                type: string
               pvcName:
                 description: PVCName is the PVC for etcd backup storage.
                 minLength: 1
@@ -120,17 +177,23 @@ spec:
                 minimum: 1
                 type: integer
               schedule:
-                description: Schedule is a cron expression (e.g. "0 2 * * *" for daily
-                  at 2 AM).
-                minLength: 1
+                description: |-
+                  Schedule is a raw cron expression for advanced users.
+                  If set, this overrides the frequency/time/day fields.
                 type: string
               suspend:
                 default: false
                 description: Suspend pauses scheduling when true.
                 type: boolean
+              time:
+                default: "02:00"
+                description: |-
+                  Time is the time of day in HH:MM format (UTC).
+                  Used with Daily, Weekly, and Monthly frequencies.
+                pattern: ^([01]\d|2[0-3]):[0-5]\d$
+                type: string
             required:
             - pvcName
-            - schedule
             type: object
           status:
             description: BackupScheduleStatus defines the observed state of BackupSchedule.
@@ -201,6 +264,10 @@ spec:
                   backups.
                 format: int32
                 type: integer
+              humanReadableSchedule:
+                description: HumanReadableSchedule is a user-friendly description
+                  of the schedule.
+                type: string
               lastBackupTime:
                 description: LastBackupTime is when the most recent backup was triggered.
                 format: date-time
@@ -215,6 +282,10 @@ spec:
                 type: string
               phase:
                 description: Phase is Active or Suspended.
+                type: string
+              resolvedSchedule:
+                description: ResolvedSchedule is the cron expression computed from
+                  the frequency fields.
                 type: string
             type: object
         type: object

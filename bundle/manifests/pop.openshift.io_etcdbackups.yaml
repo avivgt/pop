@@ -21,6 +21,15 @@ spec:
     - jsonPath: .status.backupNode
       name: Node
       type: string
+    - jsonPath: .status.backupSize
+      name: Size
+      type: string
+    - jsonPath: .status.pvcUsagePercent
+      name: PVC%
+      type: integer
+    - jsonPath: .status.estimatedCapacity
+      name: Fits
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -112,6 +121,14 @@ spec:
                   The PVC must exist in the same namespace as the EtcdBackup resource.
                 minLength: 1
                 type: string
+              retentionCount:
+                default: 5
+                description: |-
+                  RetentionCount is the max number of backups to keep on the PVC.
+                  Older backups are deleted before the new backup runs.
+                format: int32
+                minimum: 1
+                type: integer
             required:
             - pvcName
             type: object
@@ -126,6 +143,14 @@ spec:
                 description: BackupPath is the path within the PVC where backup files
                   are stored.
                 type: string
+              backupSize:
+                description: BackupSize is the human-readable backup size (e.g., "1.5Gi").
+                type: string
+              backupSizeBytes:
+                description: BackupSizeBytes is the size of this backup's artifacts
+                  in bytes.
+                format: int64
+                type: integer
               completionTime:
                 description: CompletionTime is when the backup completed.
                 format: date-time
@@ -187,6 +212,15 @@ spec:
                   - type
                   type: object
                 type: array
+              defragSaved:
+                description: DefragSaved is the human-readable space saved by pre-backup
+                  etcd defragmentation.
+                type: string
+              estimatedCapacity:
+                description: EstimatedCapacity is how many backups of this size the
+                  PVC can hold at 80% utilization.
+                format: int32
+                type: integer
               jobName:
                 description: JobName is the name of the backup Job created by this
                   resource.
@@ -203,12 +237,34 @@ spec:
                 - Completed
                 - Failed
                 type: string
+              pvcCapacityBytes:
+                description: PVCCapacityBytes is the total PVC capacity in bytes.
+                format: int64
+                type: integer
+              pvcUsagePercent:
+                description: PVCUsagePercent is the PVC usage percentage after this
+                  backup.
+                format: int32
+                type: integer
+              pvcUsedBytes:
+                description: PVCUsedBytes is the PVC usage in bytes after this backup
+                  completed.
+                format: int64
+                type: integer
+              recommendedPVCSize:
+                description: RecommendedPVCSize is the PVC size needed to hold retentionCount
+                  backups of this size.
+                type: string
               s3URI:
                 description: S3URI is the S3 object URI if exported to S3.
                 type: string
               snapshotFile:
                 description: SnapshotFile is the name of the etcd snapshot file.
                 type: string
+              snapshotVerified:
+                description: SnapshotVerified indicates whether the backup snapshot
+                  passed integrity verification.
+                type: boolean
               startTime:
                 description: StartTime is when the backup started.
                 format: date-time
