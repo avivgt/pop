@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  go:
+    name: Go Build, Lint, Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Generate
+        run: make generate
+
+      - name: Manifests
+        run: make manifests
+
+      - name: Verify no generated diff
+        run: git diff --exit-code
+
+      - name: Build
+        run: make build
+
+      - name: Lint
+        run: make lint
+
+      - name: Lint watches
+        run: make lint-watches
+
+      - name: Test
+        run: make test
+
+      - name: Upload coverage
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: cover.out
+
+  frontend:
+    name: Frontend Build & Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: console-plugin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: console-plugin/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npx eslint src/
+
+      - name: Build
+        run: npm run build
