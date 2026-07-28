@@ -145,6 +145,11 @@ spec:
                   - type
                   type: object
                 type: array
+              degradedCheckCount:
+                description: DegradedCheckCount tracks consecutive checks with degraded
+                  operators.
+                format: int32
+                type: integer
               degradedOperators:
                 description: DegradedOperators lists ClusterOperators that are Degraded
                   or not Available.
@@ -176,6 +181,10 @@ spec:
                   - role
                   type: object
                 type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed.
+                format: int64
+                type: integer
               phase:
                 description: Phase is the current phase.
                 enum:

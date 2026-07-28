@@ -15,9 +15,11 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
+ARG VERSION=0.2.0
+
 LABEL name="pop-operator" \
       vendor="POP Project" \
-      version="0.1.0" \
+      version="${VERSION}" \
       summary="POP Operator - Power Outage Provisioner" \
       description="Automates OpenShift control plane backup and graceful cluster shutdown" \
       io.k8s.display-name="POP Operator" \

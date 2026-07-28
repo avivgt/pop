@@ -25,8 +25,8 @@ describe('phaseToColor', () => {
     expect(phaseToColor('Suspended')).toBe('orange');
   });
 
-  it('returns cyan for Validating', () => {
-    expect(phaseToColor('Validating')).toBe('cyan');
+  it('returns teal for Validating', () => {
+    expect(phaseToColor('Validating')).toBe('teal');
   });
 
   it('returns grey for Pending and unknown phases', () => {

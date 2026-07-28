@@ -17,17 +17,22 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -44,6 +49,7 @@ import (
 	"github.com/avivgt/pop/internal/controller"
 	"github.com/avivgt/pop/internal/eventsource"
 	_ "github.com/avivgt/pop/internal/metrics"
+	"github.com/avivgt/pop/internal/notification"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -201,9 +207,11 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "AutomatedProceduresConfig")
 		os.Exit(1)
 	}
+	notificationService := notification.NewService(mgr.GetClient(), ctrl.Log.WithName("notification"))
 	if err = (&controller.PowerEventReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		NotificationService: notificationService,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PowerEvent")
 		os.Exit(1)
@@ -224,14 +232,13 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	var alertPort int32
-	flag.Visit(func(f *flag.Flag) {})
-	alertPort = 8082
+	var alertPort int32 = 8082
+	alertAuthToken := resolveAlertAuthToken(mgr.GetClient(), namespace)
 	alertServer := alert.NewServer(
 		mgr.GetClient(),
 		namespace,
 		alertPort,
-		"",
+		alertAuthToken,
 		ctrl.Log.WithName("alert-server"),
 	)
 	if err := mgr.Add(alertServer); err != nil {
@@ -260,4 +267,41 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func resolveAlertAuthToken(k8sClient client.Client, namespace string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	config := &popv1alpha1.AutomatedProceduresConfig{}
+	err := k8sClient.Get(ctx, types.NamespacedName{Name: "default", Namespace: namespace}, config)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			setupLog.Info("AutomatedProceduresConfig 'default' not found, alert endpoint will accept unauthenticated requests")
+		} else {
+			setupLog.Error(err, "failed to read AutomatedProceduresConfig")
+		}
+		return ""
+	}
+
+	secretName := config.Spec.AlertEndpoint.AuthTokenSecret
+	if secretName == "" {
+		setupLog.Info("no authTokenSecret configured, alert endpoint will accept unauthenticated requests")
+		return ""
+	}
+
+	secret := &corev1.Secret{}
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, secret); err != nil {
+		setupLog.Error(err, "failed to read alert auth token secret", "secret", secretName)
+		return ""
+	}
+
+	token, ok := secret.Data["token"]
+	if !ok || len(token) == 0 {
+		setupLog.Info("alert auth token secret exists but has no 'token' key", "secret", secretName)
+		return ""
+	}
+
+	setupLog.Info("alert endpoint authentication configured", "secret", secretName)
+	return string(token)
 }

@@ -64,6 +64,7 @@ func (r *EtcdBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.Get(ctx, req.NamespacedName, backup); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	backup.Status.ObservedGeneration = backup.Generation
 
 	if backup.Status.Phase == popv1alpha1.EtcdBackupPhaseCompleted ||
 		backup.Status.Phase == popv1alpha1.EtcdBackupPhaseFailed {
@@ -389,7 +390,7 @@ echo "Backup completed successfully to ${BACKUP_DIR}"
 					Containers: []corev1.Container{
 						{
 							Name:    "backup",
-							Image:   "registry.access.redhat.com/ubi9/ubi-minimal:latest",
+							Image:   defaultJobImage,
 							Command: []string{"/bin/bash", "-c"},
 							Args:    []string{backupScript},
 							Env: []corev1.EnvVar{

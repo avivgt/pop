@@ -70,6 +70,14 @@ spec:
                 default: true
                 description: CordonNodes when true cordons all nodes before shutdown.
                 type: boolean
+              drainTimeoutSeconds:
+                default: 300
+                description: DrainTimeoutSeconds is the maximum time to wait for pod
+                  evictions per node.
+                format: int32
+                maximum: 1800
+                minimum: 30
+                type: integer
               dryRun:
                 default: false
                 description: |-
@@ -289,6 +297,10 @@ spec:
                   - status
                   type: object
                 type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed.
+                format: int64
+                type: integer
               phase:
                 description: Phase is the current phase.
                 enum:
@@ -296,6 +308,7 @@ spec:
                 - Scheduled
                 - Validating
                 - Cordoning
+                - Draining
                 - RunningHooks
                 - NotifyingApps
                 - BackingUp

@@ -1,3 +1,4 @@
+import { POP_NAMESPACE } from '../constants';
 import React from 'react';
 import {
   PageSection,
@@ -33,7 +34,7 @@ import StatusBar from './StatusBar';
 import PhaseLabel from './shared/PhaseLabel';
 import { formatTimestamp } from '../utils';
 
-const NAMESPACE = 'pop-system';
+const NAMESPACE = POP_NAMESPACE;
 
 const DashboardPage: React.FC = () => {
   const [config, configLoaded, configError] = useK8sWatchResource<ClusterLifecycleConfigResource>({
@@ -74,7 +75,7 @@ const DashboardPage: React.FC = () => {
   if (!configLoaded) {
     return (
       <>
-        <PageSection variant="light">
+        <PageSection variant="default">
           <Title headingLevel="h1">POP - Power Outage Provisioner</Title>
         </PageSection>
         <PageSection>
@@ -106,7 +107,7 @@ const DashboardPage: React.FC = () => {
 
   return (
     <>
-      <PageSection variant="light">
+      <PageSection variant="default">
         <Title headingLevel="h1">POP - Power Outage Provisioner</Title>
       </PageSection>
 

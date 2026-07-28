@@ -31,20 +31,21 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
 )
 
-const roleControlPlane = "control-plane"
+const (
+	roleControlPlane = "control-plane"
+	defaultJobImage  = "registry.access.redhat.com/ubi9/ubi-minimal:9.5"
+)
 
 // ClusterRestartReconciler reconciles a ClusterRestart object
 type ClusterRestartReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-
-	// degradedCheckCount tracks consecutive checks with degraded operators
-	degradedCheckCount int
 }
 
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=clusterrestarts,verbs=get;list;watch;create;update;patch;delete
@@ -64,6 +65,29 @@ func (r *ClusterRestartReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err := r.Get(ctx, req.NamespacedName, restart); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	// Handle deletion: remove finalizer if present
+	if !restart.DeletionTimestamp.IsZero() {
+		if controllerutil.ContainsFinalizer(restart, "pop.openshift.io/restart-cleanup") {
+			controllerutil.RemoveFinalizer(restart, "pop.openshift.io/restart-cleanup")
+			if err := r.Update(ctx, restart); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Ensure finalizer is present
+	if !controllerutil.ContainsFinalizer(restart, "pop.openshift.io/restart-cleanup") {
+		controllerutil.AddFinalizer(restart, "pop.openshift.io/restart-cleanup")
+		if err := r.Update(ctx, restart); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Track observed generation
+	restart.Status.ObservedGeneration = restart.Generation
 
 	if restart.Status.Phase == popv1alpha1.ClusterRestartPhaseComplete ||
 		restart.Status.Phase == popv1alpha1.ClusterRestartPhaseFailed {
@@ -279,7 +303,7 @@ func (r *ClusterRestartReconciler) reconcileWaitingForWorkers(ctx context.Contex
 			Reason:  "AllNodesReady",
 			Message: fmt.Sprintf("All %d nodes are Ready", totalCount),
 		})
-		r.degradedCheckCount = 0
+		restart.Status.DegradedCheckCount = 0
 		if err := r.Status().Update(ctx, restart); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -350,10 +374,10 @@ func (r *ClusterRestartReconciler) reconcileVerifyingOperators(ctx context.Conte
 		return r.setComplete(ctx, restart, fmt.Sprintf("Cluster restart complete, all %d ClusterOperators healthy", len(coList.Items)))
 	}
 
-	r.degradedCheckCount++
-	logger.Info("degraded operators detected", "operators", degradedOperators, "consecutiveChecks", r.degradedCheckCount)
+	restart.Status.DegradedCheckCount++
+	logger.Info("degraded operators detected", "operators", degradedOperators, "consecutiveChecks", restart.Status.DegradedCheckCount)
 
-	if r.degradedCheckCount >= 3 {
+	if restart.Status.DegradedCheckCount >= 3 {
 		// After 3 consecutive checks with degraded operators, complete with warning
 		now := metav1.Now()
 		restart.Status.Phase = popv1alpha1.ClusterRestartPhaseComplete
@@ -377,7 +401,7 @@ func (r *ClusterRestartReconciler) reconcileVerifyingOperators(ctx context.Conte
 		return ctrl.Result{}, nil
 	}
 
-	restart.Status.Message = fmt.Sprintf("Waiting for %d degraded operators to stabilize (check %d/3): %v", len(degradedOperators), r.degradedCheckCount, degradedOperators)
+	restart.Status.Message = fmt.Sprintf("Waiting for %d degraded operators to stabilize (check %d/3): %v", len(degradedOperators), restart.Status.DegradedCheckCount, degradedOperators)
 	if err := r.Status().Update(ctx, restart); err != nil {
 		return ctrl.Result{}, err
 	}

@@ -2,3 +2,6 @@
 # Ignore build and test binaries.
 bin/
 !bin/manager-linux-amd64
+.claude/
+.remember/
+docs/

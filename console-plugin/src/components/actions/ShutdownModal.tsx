@@ -2,6 +2,9 @@ import React from 'react';
 import {
   Modal,
   ModalVariant,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
   Button,
   TextInput,
   Alert,
@@ -80,56 +83,57 @@ const ShutdownModal: React.FC<ShutdownModalProps> = ({
   return (
     <Modal
       variant={ModalVariant.small}
-      title={isTest ? 'Test Shutdown' : 'Shutdown Cluster'}
       isOpen={isOpen}
       onClose={handleClose}
-      actions={[
+    >
+      <ModalHeader title={isTest ? 'Test Shutdown' : 'Shutdown Cluster'} />
+      <ModalBody>
+        <Form>
+          {isTest ? (
+            <Alert
+              variant="info"
+              isInline
+              isPlain
+              title="Runs the full shutdown procedure (validate, hooks, backup) without cordoning nodes or powering down."
+            />
+          ) : (
+            <Alert
+              variant="danger"
+              isInline
+              title="This will shut down the entire cluster"
+              style={{ marginBottom: 16 }}
+            >
+              All nodes will be cordoned and powered off. This action cannot be undone from the console.
+            </Alert>
+          )}
+          <FormGroup label="Reason" isRequired={!isTest} fieldId="shutdown-reason" style={{ marginTop: 16 }}>
+            <TextInput
+              id="shutdown-reason"
+              value={reason}
+              onChange={(_event, value) => setReason(value)}
+              placeholder={isTest ? 'e.g. Pre-maintenance validation (optional)' : 'e.g. Scheduled maintenance window'}
+            />
+          </FormGroup>
+        </Form>
+        {error && (
+          <Alert variant="danger" isInline title="Error" style={{ marginTop: 16 }}>
+            {error}
+          </Alert>
+        )}
+      </ModalBody>
+      <ModalFooter>
         <Button
-          key="confirm"
           variant={isTest ? 'primary' : 'danger'}
           onClick={handleSubmit}
           isLoading={isSubmitting}
           isDisabled={isSubmitting || (!isTest && !reason.trim())}
         >
           {isTest ? 'Run Test' : 'Shutdown Cluster'}
-        </Button>,
-        <Button key="cancel" variant="link" onClick={handleClose} isDisabled={isSubmitting}>
+        </Button>
+        <Button variant="link" onClick={handleClose} isDisabled={isSubmitting}>
           Cancel
-        </Button>,
-      ]}
-    >
-      <Form>
-        {isTest ? (
-          <Alert
-            variant="info"
-            isInline
-            isPlain
-            title="Runs the full shutdown procedure (validate, hooks, backup) without cordoning nodes or powering down."
-          />
-        ) : (
-          <Alert
-            variant="danger"
-            isInline
-            title="This will shut down the entire cluster"
-            style={{ marginBottom: 16 }}
-          >
-            All nodes will be cordoned and powered off. This action cannot be undone from the console.
-          </Alert>
-        )}
-        <FormGroup label="Reason" isRequired={!isTest} fieldId="shutdown-reason" style={{ marginTop: 16 }}>
-          <TextInput
-            id="shutdown-reason"
-            value={reason}
-            onChange={(_event, value) => setReason(value)}
-            placeholder={isTest ? 'e.g. Pre-maintenance validation (optional)' : 'e.g. Scheduled maintenance window'}
-          />
-        </FormGroup>
-      </Form>
-      {error && (
-        <Alert variant="danger" isInline title="Error" style={{ marginTop: 16 }}>
-          {error}
-        </Alert>
-      )}
+        </Button>
+      </ModalFooter>
     </Modal>
   );
 };

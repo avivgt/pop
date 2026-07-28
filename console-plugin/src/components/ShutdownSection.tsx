@@ -159,7 +159,7 @@ const ShutdownSection: React.FC<ShutdownSectionProps> = ({
         </Split>
 
         {showProgress && (
-          <Card isFlat style={{ marginBottom: 16 }}>
+          <Card isPlain style={{ marginBottom: 16 }}>
             <CardBody>
               <Split style={{ marginBottom: 12 }}>
                 <SplitItem isFilled>

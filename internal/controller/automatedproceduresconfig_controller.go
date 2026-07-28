@@ -57,6 +57,7 @@ func (r *AutomatedProceduresConfigReconciler) Reconcile(ctx context.Context, req
 	if err := r.Get(ctx, req.NamespacedName, config); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	config.Status.ObservedGeneration = config.Generation
 
 	if !config.Spec.Enabled {
 		config.Status.AlertEndpointReady = false

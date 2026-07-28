@@ -1,3 +1,4 @@
+import { POP_NAMESPACE } from '../constants';
 import React from 'react';
 import {
   PageSection,
@@ -12,7 +13,7 @@ import { ClusterLifecycleConfigModel, AutomatedProceduresConfigModel } from '../
 import { ClusterLifecycleConfigResource, AutomatedProceduresConfigResource } from '../types';
 import SettingsSection from './SettingsSection';
 
-const NAMESPACE = 'pop-system';
+const NAMESPACE = POP_NAMESPACE;
 
 const SettingsPage: React.FC = () => {
   const [config, configLoaded, configError] = useK8sWatchResource<ClusterLifecycleConfigResource>({
@@ -40,7 +41,7 @@ const SettingsPage: React.FC = () => {
   if (!configLoaded) {
     return (
       <>
-        <PageSection variant="light">
+        <PageSection variant="default">
           <Title headingLevel="h1">Settings</Title>
         </PageSection>
         <PageSection>
@@ -57,7 +58,7 @@ const SettingsPage: React.FC = () => {
 
   return (
     <>
-      <PageSection variant="light">
+      <PageSection variant="default">
         <Title headingLevel="h1">Settings</Title>
       </PageSection>
 

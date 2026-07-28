@@ -1,3 +1,4 @@
+import { POP_NAMESPACE } from '../constants';
 import React from 'react';
 import {
   PageSection,
@@ -27,7 +28,7 @@ interface BackupScheduleResource extends K8sResourceCommon {
   };
 }
 
-const NAMESPACE = 'pop-system';
+const NAMESPACE = POP_NAMESPACE;
 
 const BackupScheduleList: React.FC = () => {
   const [backupSchedules, loaded, error] = useK8sWatchResource<BackupScheduleResource[]>({
@@ -71,7 +72,7 @@ const BackupScheduleList: React.FC = () => {
 
   return (
     <>
-      <PageSection variant="light">
+      <PageSection variant="default">
         <Breadcrumb>
           <BreadcrumbItem to="/backup-and-restore">Dashboard</BreadcrumbItem>
           <BreadcrumbItem to="/backup-and-restore/backup">etcd Backup</BreadcrumbItem>

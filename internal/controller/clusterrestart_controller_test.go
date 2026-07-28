@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -79,6 +80,78 @@ var _ = Describe("ClusterRestart Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
 			// Example: If you expect a certain status condition after reconciliation, verify it here.
+		})
+	})
+
+	Context("Finalizer and observedGeneration", func() {
+		It("should add finalizer on first reconcile", func() {
+			name := "restart-finalizer-test"
+			resource := &popv1alpha1.ClusterRestart{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			}
+			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			defer func() { _ = k8sClient.Delete(ctx, resource) }()
+
+			reconciler := &ClusterRestartReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: name, Namespace: "default"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			updated := &popv1alpha1.ClusterRestart{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: "default"}, updated)).To(Succeed())
+			Expect(controllerutil.ContainsFinalizer(updated, "pop.openshift.io/restart-cleanup")).To(BeTrue())
+		})
+
+		It("should set observedGeneration on reconcile", func() {
+			name := "restart-obsgen-test"
+			resource := &popv1alpha1.ClusterRestart{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			}
+			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			defer func() { _ = k8sClient.Delete(ctx, resource) }()
+
+			reconciler := &ClusterRestartReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+			// First reconcile adds finalizer.
+			reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: name, Namespace: "default"},
+			})
+			// Second reconcile sets phase.
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: name, Namespace: "default"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			updated := &popv1alpha1.ClusterRestart{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: "default"}, updated)).To(Succeed())
+			Expect(updated.Status.ObservedGeneration).To(Equal(updated.Generation))
+		})
+
+		It("should persist degradedCheckCount in status not reconciler struct", func() {
+			name := "restart-degraded-count-test"
+			resource := &popv1alpha1.ClusterRestart{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       name,
+					Namespace:  "default",
+					Finalizers: []string{"pop.openshift.io/restart-cleanup"},
+				},
+			}
+			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			resource.Status.Phase = popv1alpha1.ClusterRestartPhaseVerifyingOperators
+			resource.Status.DegradedCheckCount = 2
+			Expect(k8sClient.Status().Update(ctx, resource)).To(Succeed())
+			defer func() { _ = k8sClient.Delete(ctx, resource) }()
+
+			// Verify the count persists in the CR status.
+			updated := &popv1alpha1.ClusterRestart{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: "default"}, updated)).To(Succeed())
+			Expect(updated.Status.DegradedCheckCount).To(Equal(int32(2)))
 		})
 	})
 })

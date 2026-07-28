@@ -93,6 +93,12 @@ type ClusterRestartStatus struct {
 	// CompletionTime is when the process completed.
 	CompletionTime *metav1.Time `json:"completionTime,omitempty"`
 
+	// DegradedCheckCount tracks consecutive checks with degraded operators.
+	DegradedCheckCount int32 `json:"degradedCheckCount,omitempty"`
+
+	// ObservedGeneration is the most recent generation observed.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Message provides detail about the current phase.
 	Message string `json:"message,omitempty"`
 

@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
+	popmetrics "github.com/avivgt/pop/internal/metrics"
 )
 
 // BackupScheduleReconciler reconciles a BackupSchedule object
@@ -53,6 +54,7 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err := r.Get(ctx, req.NamespacedName, schedule); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	schedule.Status.ObservedGeneration = schedule.Generation
 
 	now := time.Now()
 
@@ -168,6 +170,13 @@ func (r *BackupScheduleReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// 7. If current time >= nextBackupTime, create a new EtcdBackup.
 	if !now.Before(nextBackupTime) {
+		if schedule.Status.LastBackupTime != nil {
+			expectedInterval := nextBackupTime.Sub(schedule.Status.LastBackupTime.Time)
+			if now.Sub(nextBackupTime) > expectedInterval {
+				popmetrics.BackupScheduleMissed.Inc()
+			}
+		}
+
 		timestamp := now.Format("20060102-150405")
 		backupName := fmt.Sprintf("%s-%s", schedule.Name, timestamp)
 

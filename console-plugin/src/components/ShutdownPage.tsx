@@ -1,3 +1,4 @@
+import { POP_NAMESPACE } from '../constants';
 import React from 'react';
 import {
   PageSection,
@@ -21,7 +22,7 @@ import {
 } from '../types';
 import ShutdownSection from './ShutdownSection';
 
-const NAMESPACE = 'pop-system';
+const NAMESPACE = POP_NAMESPACE;
 
 const ShutdownPage: React.FC = () => {
   const [config, configLoaded, configError] = useK8sWatchResource<ClusterLifecycleConfigResource>({
@@ -51,7 +52,7 @@ const ShutdownPage: React.FC = () => {
   if (!configLoaded) {
     return (
       <>
-        <PageSection variant="light">
+        <PageSection variant="default">
           <Title headingLevel="h1">Cluster Shutdown</Title>
         </PageSection>
         <PageSection>
@@ -68,7 +69,7 @@ const ShutdownPage: React.FC = () => {
 
   return (
     <>
-      <PageSection variant="light">
+      <PageSection variant="default">
         <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
           <FlexItem>
             <Title headingLevel="h1">Cluster Shutdown</Title>

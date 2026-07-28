@@ -55,6 +55,7 @@ func (r *WorkloadEvacuationReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if err := r.Get(ctx, req.NamespacedName, evacuation); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	evacuation.Status.ObservedGeneration = evacuation.Generation
 
 	// Terminal phases — nothing to do.
 	if evacuation.Status.Phase == popv1alpha1.EvacuationPhaseComplete ||

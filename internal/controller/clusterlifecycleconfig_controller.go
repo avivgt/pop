@@ -59,6 +59,7 @@ func (r *ClusterLifecycleConfigReconciler) Reconcile(ctx context.Context, req ct
 	if err := r.Get(ctx, req.NamespacedName, config); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	config.Status.ObservedGeneration = config.Generation
 
 	now := time.Now()
 	requeueAfter := 1 * time.Minute

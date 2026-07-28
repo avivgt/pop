@@ -1,3 +1,4 @@
+import { POP_NAMESPACE } from '../constants';
 import React from 'react';
 import {
   PageSection,
@@ -18,7 +19,7 @@ import {
 } from '../types';
 import AutomatedProceduresSection from './AutomatedProceduresSection';
 
-const NAMESPACE = 'pop-system';
+const NAMESPACE = POP_NAMESPACE;
 
 const AutomatedProceduresPage: React.FC = () => {
   const [apConfig, apConfigLoaded, apConfigError] = useK8sWatchResource<AutomatedProceduresConfigResource>({
@@ -48,7 +49,7 @@ const AutomatedProceduresPage: React.FC = () => {
   if (!apConfigLoaded) {
     return (
       <>
-        <PageSection variant="light">
+        <PageSection variant="default">
           <Title headingLevel="h1">Automated Procedures</Title>
         </PageSection>
         <PageSection>
@@ -65,7 +66,7 @@ const AutomatedProceduresPage: React.FC = () => {
 
   return (
     <>
-      <PageSection variant="light">
+      <PageSection variant="default">
         <Title headingLevel="h1">Automated Procedures</Title>
       </PageSection>
 

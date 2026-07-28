@@ -32,12 +32,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
+	popmetrics "github.com/avivgt/pop/internal/metrics"
+	"github.com/avivgt/pop/internal/notification"
 )
 
 // PowerEventReconciler reconciles a PowerEvent object
 type PowerEventReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme              *runtime.Scheme
+	NotificationService *notification.Service
 }
 
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=powerevents,verbs=get;list;watch;create;update;patch;delete
@@ -55,6 +58,7 @@ func (r *PowerEventReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.Get(ctx, req.NamespacedName, event); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	event.Status.ObservedGeneration = event.Generation
 
 	// Terminal states — nothing to do.
 	if event.Status.Phase == popv1alpha1.PowerEventPhaseComplete ||
@@ -75,6 +79,8 @@ func (r *PowerEventReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Reason:  "EventDetected",
 			Message: fmt.Sprintf("Power event of type %s detected", event.Spec.EventType),
 		})
+		popmetrics.PowerEventTotal.WithLabelValues(string(event.Spec.EventType)).Inc()
+		r.sendNotification(ctx, event, fmt.Sprintf("Power event detected: %s", event.Spec.EventType))
 		if err := r.Status().Update(ctx, event); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -320,6 +326,7 @@ func (r *PowerEventReconciler) reconcileAwaitingConfirmation(ctx context.Context
 		event.Status.Phase = popv1alpha1.PowerEventPhaseConfirmed
 		event.Status.ConfirmedAt = &confirmedAt
 		event.Status.Message = "Power outage confirmed"
+		r.sendNotification(ctx, event, "Power outage confirmed after confirmation period")
 		meta.SetStatusCondition(&event.Status.Conditions, metav1.Condition{
 			Type:    "Confirmed",
 			Status:  metav1.ConditionTrue,
@@ -416,6 +423,7 @@ func (r *PowerEventReconciler) reconcileShuttingDown(ctx context.Context, event 
 	// Wait for shutdown deadline if set and not yet reached.
 	if event.Status.ShutdownDeadline != nil && time.Now().Before(event.Status.ShutdownDeadline.Time) {
 		remaining := time.Until(event.Status.ShutdownDeadline.Time)
+		popmetrics.AutonomousShutdownCountdown.Set(remaining.Seconds())
 		return ctrl.Result{RequeueAfter: remaining}, nil
 	}
 
@@ -483,6 +491,7 @@ func (r *PowerEventReconciler) reconcileShuttingDown(ctx context.Context, event 
 
 	switch shutdown.Status.Phase {
 	case popv1alpha1.ClusterShutdownPhaseComplete:
+		popmetrics.AutonomousShutdownCountdown.Set(0)
 		event.Status.Phase = popv1alpha1.PowerEventPhaseComplete
 		event.Status.Message = "Cluster shutdown completed successfully"
 		meta.SetStatusCondition(&event.Status.Conditions, metav1.Condition{
@@ -532,6 +541,8 @@ func (r *PowerEventReconciler) checkForCancellation(ctx context.Context, event *
 }
 
 func (r *PowerEventReconciler) setCancelled(ctx context.Context, event *popv1alpha1.PowerEvent) (ctrl.Result, error) {
+	popmetrics.AutonomousShutdownCountdown.Set(0)
+	r.sendNotification(ctx, event, "Power restored. Shutdown cancelled. Backup retained.")
 	now := metav1.Now()
 	event.Status.Phase = popv1alpha1.PowerEventPhaseCancelled
 	event.Status.CancelledAt = &now
@@ -550,6 +561,7 @@ func (r *PowerEventReconciler) setCancelled(ctx context.Context, event *popv1alp
 
 func (r *PowerEventReconciler) setFailed(ctx context.Context, event *popv1alpha1.PowerEvent, message string) (ctrl.Result, error) {
 	log.FromContext(ctx).Error(errors.New(message), "power event failed")
+	r.sendNotification(ctx, event, fmt.Sprintf("Power event failed: %s", message))
 	event.Status.Phase = popv1alpha1.PowerEventPhaseFailed
 	event.Status.Message = message
 	meta.SetStatusCondition(&event.Status.Conditions, metav1.Condition{
@@ -562,6 +574,19 @@ func (r *PowerEventReconciler) setFailed(ctx context.Context, event *popv1alpha1
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *PowerEventReconciler) sendNotification(ctx context.Context, event *popv1alpha1.PowerEvent, message string) {
+	if r.NotificationService == nil {
+		return
+	}
+	config := &popv1alpha1.AutomatedProceduresConfig{}
+	if err := r.Get(ctx, types.NamespacedName{Name: "default", Namespace: event.Namespace}, config); err != nil {
+		log.FromContext(ctx).Error(err, "failed to get config for notifications")
+		return
+	}
+	records := r.NotificationService.Notify(ctx, config, event, message)
+	event.Status.NotificationsSent = append(event.Status.NotificationsSent, records...)
 }
 
 func isTerminalPhase(phase popv1alpha1.PowerEventPhase) bool {

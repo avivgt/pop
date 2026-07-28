@@ -2,6 +2,9 @@ import React from 'react';
 import {
   Modal,
   ModalVariant,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
   Button,
   Alert,
 } from '@patternfly/react-core';
@@ -61,33 +64,34 @@ const RestartModal: React.FC<RestartModalProps> = ({
   return (
     <Modal
       variant={ModalVariant.small}
-      title="Restart Cluster"
       isOpen={isOpen}
       onClose={handleClose}
-      actions={[
+    >
+      <ModalHeader title="Restart Cluster" />
+      <ModalBody>
+        <p>
+          Are you sure you want to initiate a cluster restart? This will wait for all nodes to
+          come back online and automatically approve pending CSRs.
+        </p>
+        {error && (
+          <Alert variant="danger" isInline title="Error creating restart" style={{ marginTop: 16 }}>
+            {error}
+          </Alert>
+        )}
+      </ModalBody>
+      <ModalFooter>
         <Button
-          key="confirm"
           variant="primary"
           onClick={handleConfirm}
           isLoading={isSubmitting}
           isDisabled={isSubmitting}
         >
           Restart Cluster
-        </Button>,
-        <Button key="cancel" variant="link" onClick={handleClose} isDisabled={isSubmitting}>
+        </Button>
+        <Button variant="link" onClick={handleClose} isDisabled={isSubmitting}>
           Cancel
-        </Button>,
-      ]}
-    >
-      <p>
-        Are you sure you want to initiate a cluster restart? This will wait for all nodes to
-        come back online and automatically approve pending CSRs.
-      </p>
-      {error && (
-        <Alert variant="danger" isInline title="Error creating restart" style={{ marginTop: 16 }}>
-          {error}
-        </Alert>
-      )}
+        </Button>
+      </ModalFooter>
     </Modal>
   );
 };

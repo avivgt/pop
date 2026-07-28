@@ -177,6 +177,8 @@ type ClusterLifecycleConfigStatus struct {
 	Backup BackupStatusSummary `json:"backup,omitempty"`
 	// Cluster summarizes cluster health.
 	Cluster ClusterStatusSummary `json:"cluster,omitempty"`
+	// ObservedGeneration is the most recent generation observed.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 	// Conditions represent the latest observations.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
