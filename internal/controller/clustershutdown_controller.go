@@ -408,74 +408,12 @@ func (r *ClusterShutdownReconciler) reconcileDraining(ctx context.Context, shutd
 			}
 		}
 
-		// List pods on this node.
-		podList := &corev1.PodList{}
-		if err := r.List(ctx, podList, client.MatchingFields{"spec.nodeName": ns.Name}); err != nil {
+		// Evict all non-DaemonSet pods scheduled on this node.
+		pendingEvictions, err := r.evictNodePods(ctx, ns.Name, dsSelectors)
+		if err != nil {
 			logger.Error(err, "failed to list pods on node", "node", ns.Name)
 			allDrained = false
 			continue
-		}
-
-		pendingEvictions := 0
-		for j := range podList.Items {
-			pod := &podList.Items[j]
-
-			// Skip completed/failed pods.
-			if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
-				continue
-			}
-
-			// Skip mirror pods (static pods managed by kubelet).
-			if _, isMirror := pod.Annotations[corev1.MirrorPodAnnotationKey]; isMirror {
-				continue
-			}
-
-			// Skip DaemonSet-owned pods.
-			isDaemonSetPod := false
-			for _, ownerRef := range pod.OwnerReferences {
-				if ownerRef.Kind == "DaemonSet" {
-					isDaemonSetPod = true
-					break
-				}
-			}
-			if isDaemonSetPod {
-				continue
-			}
-
-			// Also check via label selector match as a fallback.
-			for _, sel := range dsSelectors {
-				if sel.Matches(labels.Set(pod.Labels)) {
-					isDaemonSetPod = true
-					break
-				}
-			}
-			if isDaemonSetPod {
-				continue
-			}
-
-			// Evict the pod.
-			eviction := &policyv1.Eviction{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      pod.Name,
-					Namespace: pod.Namespace,
-				},
-			}
-			if err := r.SubResource("eviction").Create(ctx, pod, eviction); err != nil {
-				if apierrors.IsNotFound(err) {
-					// Pod already gone.
-					continue
-				}
-				if apierrors.IsTooManyRequests(err) {
-					// PDB is blocking eviction, retry later.
-					logger.Info("eviction blocked by PDB, will retry", "pod", pod.Name, "node", ns.Name)
-					pendingEvictions++
-					continue
-				}
-				logger.Error(err, "failed to evict pod", "pod", pod.Name, "node", ns.Name)
-				pendingEvictions++
-				continue
-			}
-			pendingEvictions++
 		}
 
 		if pendingEvictions == 0 {
@@ -514,6 +452,80 @@ func (r *ClusterShutdownReconciler) reconcileDraining(ctx context.Context, shutd
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+}
+
+// evictNodePods evicts all running, non-DaemonSet, non-mirror pods scheduled on
+// the named node. It returns the number of pods still pending eviction (for
+// example because a PodDisruptionBudget is currently blocking eviction), or an
+// error if the pods on the node could not be listed.
+func (r *ClusterShutdownReconciler) evictNodePods(ctx context.Context, nodeName string, dsSelectors []labels.Selector) (int, error) {
+	logger := log.FromContext(ctx)
+
+	podList := &corev1.PodList{}
+	if err := r.List(ctx, podList, client.MatchingFields{"spec.nodeName": nodeName}); err != nil {
+		return 0, err
+	}
+
+	pendingEvictions := 0
+	for j := range podList.Items {
+		pod := &podList.Items[j]
+
+		// Skip completed/failed pods.
+		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+			continue
+		}
+
+		// Skip mirror pods (static pods managed by kubelet).
+		if _, isMirror := pod.Annotations[corev1.MirrorPodAnnotationKey]; isMirror {
+			continue
+		}
+
+		// Skip DaemonSet-owned pods.
+		if isDaemonSetPod(pod, dsSelectors) {
+			continue
+		}
+
+		eviction := &policyv1.Eviction{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			},
+		}
+		if err := r.SubResource("eviction").Create(ctx, pod, eviction); err != nil {
+			if apierrors.IsNotFound(err) {
+				// Pod already gone.
+				continue
+			}
+			if apierrors.IsTooManyRequests(err) {
+				// PDB is blocking eviction, retry later.
+				logger.Info("eviction blocked by PDB, will retry", "pod", pod.Name, "node", nodeName)
+				pendingEvictions++
+				continue
+			}
+			logger.Error(err, "failed to evict pod", "pod", pod.Name, "node", nodeName)
+			pendingEvictions++
+			continue
+		}
+		pendingEvictions++
+	}
+
+	return pendingEvictions, nil
+}
+
+// isDaemonSetPod reports whether a pod is managed by a DaemonSet, either via an
+// owner reference or by matching one of the known DaemonSet pod selectors.
+func isDaemonSetPod(pod *corev1.Pod, dsSelectors []labels.Selector) bool {
+	for _, ownerRef := range pod.OwnerReferences {
+		if ownerRef.Kind == "DaemonSet" {
+			return true
+		}
+	}
+	for _, sel := range dsSelectors {
+		if sel.Matches(labels.Set(pod.Labels)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *ClusterShutdownReconciler) cleanupOnDeletion(ctx context.Context, shutdown *popv1alpha1.ClusterShutdown) error {

@@ -45,11 +45,11 @@ func newScheme(t *testing.T) *runtime.Scheme {
 	return s
 }
 
-func newConfig(ns, name string, notification *popv1alpha1.NotificationConfig) *popv1alpha1.AutomatedProceduresConfig {
+func newConfig(notification *popv1alpha1.NotificationConfig) *popv1alpha1.AutomatedProceduresConfig {
 	return &popv1alpha1.AutomatedProceduresConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
+			Name:      "default",
+			Namespace: "test-ns",
 		},
 		Spec: popv1alpha1.AutomatedProceduresConfigSpec{
 			ClusterPriority: popv1alpha1.ClusterPriorityCritical,
@@ -58,11 +58,11 @@ func newConfig(ns, name string, notification *popv1alpha1.NotificationConfig) *p
 	}
 }
 
-func newPowerEvent(ns, name string, eventType popv1alpha1.PowerEventType) *popv1alpha1.PowerEvent {
+func newPowerEvent(eventType popv1alpha1.PowerEventType) *popv1alpha1.PowerEvent {
 	return &popv1alpha1.PowerEvent{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
+			Name:      "pe-1",
+			Namespace: "test-ns",
 		},
 		Spec: popv1alpha1.PowerEventSpec{
 			EventType: eventType,
@@ -79,8 +79,8 @@ func TestNotify_NilNotificationConfig(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", nil)
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeFailure)
+	config := newConfig(nil)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeFailure)
 
 	records := svc.Notify(context.Background(), config, event, "test message")
 
@@ -108,13 +108,13 @@ func TestNotify_WebhookSuccess(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+	config := newConfig(&popv1alpha1.NotificationConfig{
 		Webhook: &popv1alpha1.WebhookNotificationConfig{
 			Enabled: true,
 			URL:     ts.URL,
 		},
 	})
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeFailure)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeFailure)
 
 	records := svc.Notify(context.Background(), config, event, "power failure detected")
 
@@ -179,14 +179,14 @@ func TestNotify_WebhookWithAuth(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).WithObjects(authSecret).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+	config := newConfig(&popv1alpha1.NotificationConfig{
 		Webhook: &popv1alpha1.WebhookNotificationConfig{
 			Enabled:    true,
 			URL:        ts.URL,
 			AuthSecret: "webhook-auth",
 		},
 	})
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeFailure)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeFailure)
 
 	records := svc.Notify(context.Background(), config, event, "test")
 
@@ -206,13 +206,13 @@ func TestNotify_WebhookEmptyURL(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+	config := newConfig(&popv1alpha1.NotificationConfig{
 		Webhook: &popv1alpha1.WebhookNotificationConfig{
 			Enabled: true,
 			URL:     "",
 		},
 	})
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeFailure)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeFailure)
 
 	records := svc.Notify(context.Background(), config, event, "test")
 
@@ -239,14 +239,14 @@ func TestNotify_WebhookAuthSecretMissing(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+	config := newConfig(&popv1alpha1.NotificationConfig{
 		Webhook: &popv1alpha1.WebhookNotificationConfig{
 			Enabled:    true,
 			URL:        ts.URL,
 			AuthSecret: "nonexistent-secret",
 		},
 	})
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeFailure)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeFailure)
 
 	records := svc.Notify(context.Background(), config, event, "test")
 
@@ -268,13 +268,13 @@ func TestNotify_WebhookNon2xx(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+	config := newConfig(&popv1alpha1.NotificationConfig{
 		Webhook: &popv1alpha1.WebhookNotificationConfig{
 			Enabled: true,
 			URL:     ts.URL,
 		},
 	})
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeFailure)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeFailure)
 
 	records := svc.Notify(context.Background(), config, event, "test")
 
@@ -294,14 +294,14 @@ func TestNotify_SMTPNoHost(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+	config := newConfig(&popv1alpha1.NotificationConfig{
 		SMTP: &popv1alpha1.SMTPNotificationConfig{
 			Enabled: true,
 			Host:    "",
 			To:      []string{"admin@example.com"},
 		},
 	})
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeFailure)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeFailure)
 
 	records := svc.Notify(context.Background(), config, event, "test")
 
@@ -321,7 +321,7 @@ func TestNotify_SMTPNoRecipients(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+	config := newConfig(&popv1alpha1.NotificationConfig{
 		SMTP: &popv1alpha1.SMTPNotificationConfig{
 			Enabled: true,
 			Host:    "mail.example.com",
@@ -329,7 +329,7 @@ func TestNotify_SMTPNoRecipients(t *testing.T) {
 			To:      nil,
 		},
 	})
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeFailure)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeFailure)
 
 	records := svc.Notify(context.Background(), config, event, "test")
 
@@ -363,13 +363,13 @@ func TestNotify_AlertmanagerSuccess(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+	config := newConfig(&popv1alpha1.NotificationConfig{
 		Alertmanager: &popv1alpha1.AlertmanagerNotificationConfig{
 			Enabled: true,
 			URL:     ts.URL,
 		},
 	})
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeFailure)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeFailure)
 
 	records := svc.Notify(context.Background(), config, event, "power failure")
 
@@ -451,13 +451,13 @@ func TestNotify_AlertmanagerSeverity(t *testing.T) {
 			cl := fake.NewClientBuilder().WithScheme(s).Build()
 			svc := NewService(cl, logr.Discard())
 
-			config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+			config := newConfig(&popv1alpha1.NotificationConfig{
 				Alertmanager: &popv1alpha1.AlertmanagerNotificationConfig{
 					Enabled: true,
 					URL:     ts.URL,
 				},
 			})
-			event := newPowerEvent("test-ns", "pe-1", tt.eventType)
+			event := newPowerEvent(tt.eventType)
 
 			records := svc.Notify(context.Background(), config, event, "test")
 
@@ -487,13 +487,13 @@ func TestNotify_AlertmanagerEmptyURL(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+	config := newConfig(&popv1alpha1.NotificationConfig{
 		Alertmanager: &popv1alpha1.AlertmanagerNotificationConfig{
 			Enabled: true,
 			URL:     "",
 		},
 	})
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeFailure)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeFailure)
 
 	records := svc.Notify(context.Background(), config, event, "test")
 
@@ -513,12 +513,12 @@ func TestNotify_KubernetesEventFailure(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+	config := newConfig(&popv1alpha1.NotificationConfig{
 		KubernetesEvents: &popv1alpha1.KubernetesEventsConfig{
 			Enabled: true,
 		},
 	})
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeFailure)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeFailure)
 
 	records := svc.Notify(context.Background(), config, event, "power failure on ups-01")
 
@@ -564,12 +564,12 @@ func TestNotify_KubernetesEventRestored(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+	config := newConfig(&popv1alpha1.NotificationConfig{
 		KubernetesEvents: &popv1alpha1.KubernetesEventsConfig{
 			Enabled: true,
 		},
 	})
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeRestored)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeRestored)
 
 	records := svc.Notify(context.Background(), config, event, "power restored")
 
@@ -615,7 +615,7 @@ func TestNotify_MultipleChannels(t *testing.T) {
 	cl := fake.NewClientBuilder().WithScheme(s).Build()
 	svc := NewService(cl, logr.Discard())
 
-	config := newConfig("test-ns", "default", &popv1alpha1.NotificationConfig{
+	config := newConfig(&popv1alpha1.NotificationConfig{
 		Webhook: &popv1alpha1.WebhookNotificationConfig{
 			Enabled: true,
 			URL:     webhookServer.URL,
@@ -625,7 +625,7 @@ func TestNotify_MultipleChannels(t *testing.T) {
 			URL:     alertmanagerServer.URL,
 		},
 	})
-	event := newPowerEvent("test-ns", "pe-1", popv1alpha1.PowerEventTypeFailure)
+	event := newPowerEvent(popv1alpha1.PowerEventTypeFailure)
 
 	records := svc.Notify(context.Background(), config, event, "outage")
 
