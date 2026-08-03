@@ -210,7 +210,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, apConfig, nam
                     isChecked={scheduleEnabled}
                     onChange={(_e, val) => setScheduleEnabled(val)}
                     label="Enabled"
-                    labelOff="Disabled"
+
                   />
                 </FormGroup>
               </GridItem>
@@ -261,8 +261,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, apConfig, nam
                     isChecked={s3Enabled}
                     onChange={(_e, val) => setS3Enabled(val)}
                     label="Enabled"
-                    labelOff="PVC only"
-                  />
+                                     />
                 </FormGroup>
               </GridItem>
               {s3Enabled && (
@@ -323,7 +322,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, apConfig, nam
                     isChecked={webhookEnabled}
                     onChange={(_e, val) => setWebhookEnabled(val)}
                     label="Enabled"
-                    labelOff="Disabled"
+
                   />
                 </FormGroup>
               </GridItem>
@@ -382,7 +381,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, apConfig, nam
             <Grid hasGutter>
               <GridItem span={3}>
                 <FormGroup label="Enable SNMP" fieldId="snmp-enabled">
-                  <Switch id="snmp-enabled" isChecked={snmpEnabled} onChange={(_e, val) => setSnmpEnabled(val)} label="Enabled" labelOff="Disabled" />
+                  <Switch id="snmp-enabled" isChecked={snmpEnabled} onChange={(_e, val) => setSnmpEnabled(val)} label="Enabled" />
                 </FormGroup>
               </GridItem>
               <GridItem span={4}>
@@ -425,7 +424,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, apConfig, nam
             <Grid hasGutter>
               <GridItem span={3}>
                 <FormGroup label="Enable IPMI" fieldId="ipmi-enabled">
-                  <Switch id="ipmi-enabled" isChecked={ipmiEnabled} onChange={(_e, val) => setIpmiEnabled(val)} label="Enabled" labelOff="Disabled" />
+                  <Switch id="ipmi-enabled" isChecked={ipmiEnabled} onChange={(_e, val) => setIpmiEnabled(val)} label="Enabled" />
                 </FormGroup>
               </GridItem>
               <GridItem span={4}>
@@ -458,7 +457,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, apConfig, nam
               </GridItem>
               <GridItem span={3}>
                 <FormGroup label="Skip TLS Verify" fieldId="ipmi-tls">
-                  <Switch id="ipmi-tls" isChecked={ipmiTlsInsecure} onChange={(_e, val) => setIpmiTlsInsecure(val)} label="Yes" labelOff="No" isDisabled={!ipmiEnabled} />
+                  <Switch id="ipmi-tls" isChecked={ipmiTlsInsecure} onChange={(_e, val) => setIpmiTlsInsecure(val)} label="Yes" isDisabled={!ipmiEnabled} />
                 </FormGroup>
               </GridItem>
             </Grid>
@@ -473,7 +472,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ config, apConfig, nam
             <Grid hasGutter>
               <GridItem span={3}>
                 <FormGroup label="Enable NUT" fieldId="nut-enabled">
-                  <Switch id="nut-enabled" isChecked={nutEnabled} onChange={(_e, val) => setNutEnabled(val)} label="Enabled" labelOff="Disabled" />
+                  <Switch id="nut-enabled" isChecked={nutEnabled} onChange={(_e, val) => setNutEnabled(val)} label="Enabled" />
                 </FormGroup>
               </GridItem>
               <GridItem span={4}>

@@ -18,6 +18,7 @@ spec:
           annotations:
             summary: "etcd backup failed"
             description: "An etcd backup has failed in the last 2 hours."
+            runbook_url: https://github.com/avivgt/pop/blob/main/docs/runbooks/pop-backup-failed.md
 
         - alert: POPNoRecentBackup
           expr: (time() - pop_etcd_backup_last_success_timestamp) > 86400
@@ -27,6 +28,7 @@ spec:
           annotations:
             summary: "No successful etcd backup in 24 hours"
             description: "The last successful etcd backup was more than 24 hours ago."
+            runbook_url: https://github.com/avivgt/pop/blob/main/docs/runbooks/pop-no-recent-backup.md
 
         - alert: POPScheduledBackupMissed
           expr: increase(pop_backup_schedule_missed_total[1h]) > 0
@@ -36,15 +38,17 @@ spec:
           annotations:
             summary: "Scheduled backup was missed"
             description: "A scheduled etcd backup was missed."
+            runbook_url: https://github.com/avivgt/pop/blob/main/docs/runbooks/pop-scheduled-backup-missed.md
 
         - alert: POPBackupSlowCompletion
-          expr: pop_etcd_backup_duration_seconds > 600
+          expr: histogram_quantile(0.99, rate(pop_etcd_backup_duration_seconds_bucket[10m])) > 600
           for: 1m
           labels:
             severity: warning
           annotations:
             summary: "etcd backup taking longer than 10 minutes"
             description: "A backup operation has been running for over 10 minutes."
+            runbook_url: https://github.com/avivgt/pop/blob/main/docs/runbooks/pop-backup-slow-completion.md
 
     - name: pop.cluster
       rules:
@@ -56,6 +60,7 @@ spec:
           annotations:
             summary: "Cluster certificate expiring soon"
             description: "The kube-apiserver-to-kubelet-signer certificate expires in less than 7 days."
+            runbook_url: https://github.com/avivgt/pop/blob/main/docs/runbooks/pop-certificate-expiring-soon.md
 
         - alert: POPCertificateExpiryCritical
           expr: (pop_certificate_expiry_timestamp - time()) < 86400
@@ -65,6 +70,7 @@ spec:
           annotations:
             summary: "Cluster certificate expires in less than 24 hours"
             description: "The kube-apiserver certificate expires in less than 1 day. Shutdown will be blocked."
+            runbook_url: https://github.com/avivgt/pop/blob/main/docs/runbooks/pop-certificate-expiry-critical.md
 
     - name: pop.shutdown
       rules:
@@ -76,6 +82,7 @@ spec:
           annotations:
             summary: "Cluster shutdown failed"
             description: "A cluster shutdown operation has failed. Investigate immediately."
+            runbook_url: https://github.com/avivgt/pop/blob/main/docs/runbooks/pop-shutdown-failed.md
 
         - alert: POPShutdownInProgress
           expr: increase(pop_cluster_shutdown_total{result="success",dryrun="false"}[5m]) > 0
@@ -85,6 +92,7 @@ spec:
           annotations:
             summary: "Cluster shutdown in progress"
             description: "A real (non-dry-run) cluster shutdown is in progress."
+            runbook_url: https://github.com/avivgt/pop/blob/main/docs/runbooks/pop-shutdown-in-progress.md
 
     - name: pop.power
       rules:
@@ -96,6 +104,7 @@ spec:
           annotations:
             summary: "Power failure detected -- cluster running on battery"
             description: "The UPS has reported a power failure. The cluster is running on battery backup."
+            runbook_url: https://github.com/avivgt/pop/blob/main/docs/runbooks/pop-power-failure-detected.md
 
         - alert: POPAutonomousShutdownImminent
           expr: pop_autonomous_shutdown_countdown_seconds > 0 and pop_autonomous_shutdown_countdown_seconds < 300
@@ -105,6 +114,7 @@ spec:
           annotations:
             summary: "Autonomous cluster shutdown imminent"
             description: "The cluster will autonomously shut down in less than 5 minutes due to sustained power failure."
+            runbook_url: https://github.com/avivgt/pop/blob/main/docs/runbooks/pop-autonomous-shutdown-imminent.md
 
         - alert: POPPowerEventUnhandled
           expr: increase(pop_power_event_total{type="PowerFailure"}[1h]) > 0 and pop_power_status == 0
@@ -114,3 +124,4 @@ spec:
           annotations:
             summary: "Power failure event received but status is normal"
             description: "A power failure event was received in the last hour but power status shows normal. Investigate if the event was handled."
+            runbook_url: https://github.com/avivgt/pop/blob/main/docs/runbooks/pop-power-event-unhandled.md

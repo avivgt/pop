@@ -22,9 +22,10 @@ type Manager struct {
 	namespace string
 	logger    logr.Logger
 
-	mu       sync.Mutex
-	monitors map[string]Monitor
-	cancel   context.CancelFunc
+	mu         sync.Mutex
+	monitors   map[string]Monitor
+	cancels    map[string]context.CancelFunc
+	lastConfig *popv1alpha1.EventSourcesConfig
 }
 
 func NewManager(client client.Client, namespace string, logger logr.Logger) *Manager {
@@ -33,6 +34,7 @@ func NewManager(client client.Client, namespace string, logger logr.Logger) *Man
 		namespace: namespace,
 		logger:    logger,
 		monitors:  make(map[string]Monitor),
+		cancels:   make(map[string]context.CancelFunc),
 	}
 }
 
@@ -40,51 +42,59 @@ func (m *Manager) Reconcile(config *popv1alpha1.EventSourcesConfig) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.cancel != nil {
-		m.cancel()
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	m.cancel = cancel
-
-	desired := make(map[string]bool)
-
 	if config == nil {
 		m.stopAll()
+		m.lastConfig = nil
 		return
 	}
+
+	desired := make(map[string]bool)
 
 	if config.SNMP != nil && config.SNMP.Enabled {
 		desired["snmp"] = true
 		if _, ok := m.monitors["snmp"]; !ok {
-			mon := NewSNMPMonitor(m.client, m.namespace, config.SNMP, m.logger.WithName("snmp"))
-			m.monitors["snmp"] = mon
-			go func() { _ = mon.Start(ctx) }()
+			m.startMonitor("snmp", NewSNMPMonitor(m.client, m.namespace, config.SNMP, m.logger.WithName("snmp")))
 		}
 	}
 
 	if config.IPMI != nil && config.IPMI.Enabled {
 		desired["ipmi"] = true
 		if _, ok := m.monitors["ipmi"]; !ok {
-			mon := NewIPMIMonitor(m.client, m.namespace, config.IPMI, m.logger.WithName("ipmi"))
-			m.monitors["ipmi"] = mon
-			go func() { _ = mon.Start(ctx) }()
+			m.startMonitor("ipmi", NewIPMIMonitor(m.client, m.namespace, config.IPMI, m.logger.WithName("ipmi")))
 		}
 	}
 
 	if config.NUT != nil && config.NUT.Enabled {
 		desired["nut"] = true
 		if _, ok := m.monitors["nut"]; !ok {
-			mon := NewNUTMonitor(m.client, m.namespace, config.NUT, m.logger.WithName("nut"))
-			m.monitors["nut"] = mon
-			go func() { _ = mon.Start(ctx) }()
+			m.startMonitor("nut", NewNUTMonitor(m.client, m.namespace, config.NUT, m.logger.WithName("nut")))
 		}
 	}
 
-	for name, mon := range m.monitors {
+	for name := range m.monitors {
 		if !desired[name] {
-			mon.Stop()
-			delete(m.monitors, name)
+			m.stopMonitor(name)
 		}
+	}
+
+	m.lastConfig = config
+}
+
+func (m *Manager) startMonitor(name string, mon Monitor) {
+	ctx, cancel := context.WithCancel(context.Background())
+	m.monitors[name] = mon
+	m.cancels[name] = cancel
+	go func() { _ = mon.Start(ctx) }()
+}
+
+func (m *Manager) stopMonitor(name string) {
+	if mon, ok := m.monitors[name]; ok {
+		mon.Stop()
+		delete(m.monitors, name)
+	}
+	if cancel, ok := m.cancels[name]; ok {
+		cancel()
+		delete(m.cancels, name)
 	}
 }
 
@@ -103,15 +113,11 @@ func (m *Manager) Stop() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.stopAll()
-	if m.cancel != nil {
-		m.cancel()
-	}
 }
 
 func (m *Manager) stopAll() {
-	for name, mon := range m.monitors {
-		mon.Stop()
-		delete(m.monitors, name)
+	for name := range m.monitors {
+		m.stopMonitor(name)
 	}
 }
 

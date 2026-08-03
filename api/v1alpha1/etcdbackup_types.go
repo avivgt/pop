@@ -123,6 +123,9 @@ type EtcdBackupStatus struct {
 	// SnapshotVerified indicates whether the backup snapshot passed integrity verification.
 	SnapshotVerified bool `json:"snapshotVerified,omitempty"`
 
+	// ObservedGeneration is the most recent generation observed.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Conditions represent the latest available observations.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

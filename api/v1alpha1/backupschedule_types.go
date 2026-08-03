@@ -148,6 +148,9 @@ type BackupScheduleStatus struct {
 	// ActiveBackup is the name of the in-progress EtcdBackup, if any.
 	ActiveBackup string `json:"activeBackup,omitempty"`
 
+	// ObservedGeneration is the most recent generation observed.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Conditions represent the latest available observations.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

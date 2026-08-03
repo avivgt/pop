@@ -14,7 +14,7 @@ import {
  */
 export function phaseToColor(
   phase: string,
-): 'green' | 'red' | 'blue' | 'grey' | 'orange' | 'cyan' {
+): 'green' | 'red' | 'blue' | 'grey' | 'orange' | 'teal' {
   switch (phase) {
     case 'Completed':
     case 'Complete':
@@ -33,7 +33,7 @@ export function phaseToColor(
     case 'Suspended':
       return 'orange';
     case 'Validating':
-      return 'cyan';
+      return 'teal';
     case 'Pending':
     default:
       return 'grey';

@@ -22,15 +22,19 @@ import (
 	"fmt"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
@@ -38,9 +42,10 @@ import (
 )
 
 const (
-	hookPhaseFailed  = "Failed"
-	hookPhaseRunning = "Running"
-	nodeShuttingDown = "ShuttingDown"
+	hookPhaseFailed          = "Failed"
+	hookPhaseRunning         = "Running"
+	nodeShuttingDown         = "ShuttingDown"
+	shutdownCleanupFinalizer = "pop.openshift.io/shutdown-cleanup"
 )
 
 type ClusterShutdownReconciler struct {
@@ -56,9 +61,11 @@ type ClusterShutdownReconciler struct {
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;delete
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
-// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups=policy,resources=pods/eviction,verbs=create
+// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=list
 
 func (r *ClusterShutdownReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -66,6 +73,33 @@ func (r *ClusterShutdownReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	shutdown := &popv1alpha1.ClusterShutdown{}
 	if err := r.Get(ctx, req.NamespacedName, shutdown); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// Set observedGeneration early so every status update path includes it.
+	shutdown.Status.ObservedGeneration = shutdown.Generation
+
+	// Handle deletion: clean up cordoned nodes and shutdown signal ConfigMap.
+	if !shutdown.DeletionTimestamp.IsZero() {
+		if controllerutil.ContainsFinalizer(shutdown, shutdownCleanupFinalizer) {
+			if err := r.cleanupOnDeletion(ctx, shutdown); err != nil {
+				return ctrl.Result{}, err
+			}
+			controllerutil.RemoveFinalizer(shutdown, shutdownCleanupFinalizer)
+			if err := r.Update(ctx, shutdown); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Ensure finalizer is present.
+	if !controllerutil.ContainsFinalizer(shutdown, shutdownCleanupFinalizer) {
+		controllerutil.AddFinalizer(shutdown, shutdownCleanupFinalizer)
+		if err := r.Update(ctx, shutdown); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	if shutdown.Status.Phase == popv1alpha1.ClusterShutdownPhaseComplete ||
@@ -92,6 +126,8 @@ func (r *ClusterShutdownReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return r.reconcileValidating(ctx, shutdown)
 	case popv1alpha1.ClusterShutdownPhaseCordoning:
 		return r.reconcileCordoning(ctx, shutdown)
+	case popv1alpha1.ClusterShutdownPhaseDraining:
+		return r.reconcileDraining(ctx, shutdown)
 	case popv1alpha1.ClusterShutdownPhaseRunningHooks:
 		return r.reconcileRunningHooks(ctx, shutdown)
 	case popv1alpha1.ClusterShutdownPhaseNotifyingApps:
@@ -264,8 +300,8 @@ func (r *ClusterShutdownReconciler) reconcileCordoning(ctx context.Context, shut
 
 	if !shutdown.Spec.CordonNodes || shutdown.Spec.DryRun {
 		logger.Info("node cordoning skipped", "cordonNodes", shutdown.Spec.CordonNodes, "dryRun", shutdown.Spec.DryRun)
-		shutdown.Status.Phase = popv1alpha1.ClusterShutdownPhaseRunningHooks
-		shutdown.Status.Message = "Cordoning skipped, running pre-shutdown hooks"
+		shutdown.Status.Phase = popv1alpha1.ClusterShutdownPhaseDraining
+		shutdown.Status.Message = "Cordoning skipped, draining nodes"
 		if err := r.Status().Update(ctx, shutdown); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -297,15 +333,8 @@ func (r *ClusterShutdownReconciler) reconcileCordoning(ctx context.Context, shut
 
 	shutdown.Status.CordonedNodes = cordonedCount
 
-	nextPhase := popv1alpha1.ClusterShutdownPhaseRunningHooks
-	nextMessage := "All nodes cordoned, running pre-shutdown hooks"
-	if len(shutdown.Spec.PreShutdownHooks) == 0 {
-		nextPhase = popv1alpha1.ClusterShutdownPhaseNotifyingApps
-		nextMessage = "All nodes cordoned, notifying applications"
-	}
-
-	shutdown.Status.Phase = nextPhase
-	shutdown.Status.Message = nextMessage
+	shutdown.Status.Phase = popv1alpha1.ClusterShutdownPhaseDraining
+	shutdown.Status.Message = "All nodes cordoned, draining workloads"
 	meta.SetStatusCondition(&shutdown.Status.Conditions, metav1.Condition{
 		Type:    "NodesCordoned",
 		Status:  metav1.ConditionTrue,
@@ -316,6 +345,229 @@ func (r *ClusterShutdownReconciler) reconcileCordoning(ctx context.Context, shut
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{Requeue: true}, nil
+}
+
+func (r *ClusterShutdownReconciler) reconcileDraining(ctx context.Context, shutdown *popv1alpha1.ClusterShutdown) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
+
+	if shutdown.Spec.DryRun {
+		logger.Info("draining skipped (dry run)")
+		shutdown.Status.Phase = popv1alpha1.ClusterShutdownPhaseRunningHooks
+		shutdown.Status.Message = "Draining skipped (dry run), running pre-shutdown hooks"
+		if len(shutdown.Spec.PreShutdownHooks) == 0 {
+			shutdown.Status.Phase = popv1alpha1.ClusterShutdownPhaseNotifyingApps
+			shutdown.Status.Message = "Draining skipped (dry run), notifying applications"
+		}
+		if err := r.Status().Update(ctx, shutdown); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	drainTimeout := time.Duration(shutdown.Spec.DrainTimeoutSeconds) * time.Second
+	if shutdown.Spec.DrainTimeoutSeconds == 0 {
+		drainTimeout = 300 * time.Second
+	}
+
+	// Build a set of DaemonSet pod selectors so we can skip them during eviction.
+	dsList := &appsv1.DaemonSetList{}
+	if err := r.List(ctx, dsList); err != nil {
+		logger.Error(err, "failed to list DaemonSets")
+		return ctrl.Result{}, err
+	}
+	dsSelectors := make([]labels.Selector, 0, len(dsList.Items))
+	for i := range dsList.Items {
+		sel, err := metav1.LabelSelectorAsSelector(dsList.Items[i].Spec.Selector)
+		if err != nil {
+			continue
+		}
+		dsSelectors = append(dsSelectors, sel)
+	}
+
+	allDrained := true
+	for i := range shutdown.Status.NodeStatuses {
+		ns := &shutdown.Status.NodeStatuses[i]
+
+		if ns.Status == "Drained" {
+			continue
+		}
+
+		// Mark as Draining on first encounter.
+		if ns.Status == "Pending" || ns.Status == "Cordoned" {
+			ns.Status = "Draining"
+		}
+
+		// Check per-node timeout based on when we started draining (use shutdown start time as baseline).
+		if shutdown.Status.StartTime != nil {
+			elapsed := time.Since(shutdown.Status.StartTime.Time)
+			if elapsed > drainTimeout {
+				logger.Info("drain timeout exceeded for node, continuing", "node", ns.Name, "elapsed", elapsed)
+				ns.Status = "Drained"
+				ns.Message = "drain timed out, continuing"
+				continue
+			}
+		}
+
+		// Evict all non-DaemonSet pods scheduled on this node.
+		pendingEvictions, err := r.evictNodePods(ctx, ns.Name, dsSelectors)
+		if err != nil {
+			logger.Error(err, "failed to list pods on node", "node", ns.Name)
+			allDrained = false
+			continue
+		}
+
+		if pendingEvictions == 0 {
+			ns.Status = "Drained"
+			ns.Message = "all non-DaemonSet pods evicted"
+		} else {
+			allDrained = false
+			ns.Message = fmt.Sprintf("draining: %d pods pending eviction", pendingEvictions)
+		}
+	}
+
+	if allDrained {
+		nextPhase := popv1alpha1.ClusterShutdownPhaseRunningHooks
+		nextMessage := "All nodes drained, running pre-shutdown hooks"
+		if len(shutdown.Spec.PreShutdownHooks) == 0 {
+			nextPhase = popv1alpha1.ClusterShutdownPhaseNotifyingApps
+			nextMessage = "All nodes drained, notifying applications"
+		}
+
+		shutdown.Status.Phase = nextPhase
+		shutdown.Status.Message = nextMessage
+		meta.SetStatusCondition(&shutdown.Status.Conditions, metav1.Condition{
+			Type:    "NodesDrained",
+			Status:  metav1.ConditionTrue,
+			Reason:  "AllNodesDrained",
+			Message: "All nodes have been drained of non-DaemonSet pods",
+		})
+		if err := r.Status().Update(ctx, shutdown); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	shutdown.Status.Message = "Draining nodes"
+	if err := r.Status().Update(ctx, shutdown); err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+}
+
+// evictNodePods evicts all running, non-DaemonSet, non-mirror pods scheduled on
+// the named node. It returns the number of pods still pending eviction (for
+// example because a PodDisruptionBudget is currently blocking eviction), or an
+// error if the pods on the node could not be listed.
+func (r *ClusterShutdownReconciler) evictNodePods(ctx context.Context, nodeName string, dsSelectors []labels.Selector) (int, error) {
+	logger := log.FromContext(ctx)
+
+	podList := &corev1.PodList{}
+	if err := r.List(ctx, podList, client.MatchingFields{"spec.nodeName": nodeName}); err != nil {
+		return 0, err
+	}
+
+	pendingEvictions := 0
+	for j := range podList.Items {
+		pod := &podList.Items[j]
+
+		// Skip completed/failed pods.
+		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+			continue
+		}
+
+		// Skip mirror pods (static pods managed by kubelet).
+		if _, isMirror := pod.Annotations[corev1.MirrorPodAnnotationKey]; isMirror {
+			continue
+		}
+
+		// Skip DaemonSet-owned pods.
+		if isDaemonSetPod(pod, dsSelectors) {
+			continue
+		}
+
+		eviction := &policyv1.Eviction{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			},
+		}
+		if err := r.SubResource("eviction").Create(ctx, pod, eviction); err != nil {
+			if apierrors.IsNotFound(err) {
+				// Pod already gone.
+				continue
+			}
+			if apierrors.IsTooManyRequests(err) {
+				// PDB is blocking eviction, retry later.
+				logger.Info("eviction blocked by PDB, will retry", "pod", pod.Name, "node", nodeName)
+				pendingEvictions++
+				continue
+			}
+			logger.Error(err, "failed to evict pod", "pod", pod.Name, "node", nodeName)
+			pendingEvictions++
+			continue
+		}
+		pendingEvictions++
+	}
+
+	return pendingEvictions, nil
+}
+
+// isDaemonSetPod reports whether a pod is managed by a DaemonSet, either via an
+// owner reference or by matching one of the known DaemonSet pod selectors.
+func isDaemonSetPod(pod *corev1.Pod, dsSelectors []labels.Selector) bool {
+	for _, ownerRef := range pod.OwnerReferences {
+		if ownerRef.Kind == "DaemonSet" {
+			return true
+		}
+	}
+	for _, sel := range dsSelectors {
+		if sel.Matches(labels.Set(pod.Labels)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *ClusterShutdownReconciler) cleanupOnDeletion(ctx context.Context, shutdown *popv1alpha1.ClusterShutdown) error {
+	logger := log.FromContext(ctx)
+
+	// Uncordon any nodes we cordoned.
+	for _, ns := range shutdown.Status.NodeStatuses {
+		node := &corev1.Node{}
+		if err := r.Get(ctx, types.NamespacedName{Name: ns.Name}, node); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			logger.Error(err, "failed to get node for uncordoning", "node", ns.Name)
+			continue
+		}
+		if !node.Spec.Unschedulable {
+			continue
+		}
+		original := node.DeepCopy()
+		node.Spec.Unschedulable = false
+		if err := r.Patch(ctx, node, client.MergeFrom(original)); err != nil {
+			logger.Error(err, "failed to uncordon node during cleanup", "node", ns.Name)
+			continue
+		}
+		logger.Info("uncordoned node during cleanup", "node", ns.Name)
+	}
+
+	// Delete the shutdown signal ConfigMap if it exists.
+	cm := &corev1.ConfigMap{}
+	cmKey := types.NamespacedName{Name: "pop-shutdown-signal", Namespace: shutdown.Namespace}
+	if err := r.Get(ctx, cmKey, cm); err != nil {
+		if !apierrors.IsNotFound(err) {
+			logger.Error(err, "failed to get shutdown signal ConfigMap for cleanup")
+		}
+		return nil
+	}
+	if err := r.Delete(ctx, cm); err != nil && !apierrors.IsNotFound(err) {
+		logger.Error(err, "failed to delete shutdown signal ConfigMap during cleanup")
+		return err
+	}
+	logger.Info("deleted shutdown signal ConfigMap during cleanup")
+	return nil
 }
 
 func (r *ClusterShutdownReconciler) reconcileRunningHooks(ctx context.Context, shutdown *popv1alpha1.ClusterShutdown) (ctrl.Result, error) {
@@ -678,7 +930,7 @@ func (r *ClusterShutdownReconciler) reconcileShuttingDown(ctx context.Context, s
 			continue
 		}
 
-		// Status == "Pending" -- create the shutdown pod
+		// Status == "Pending" or "Drained" -- create the shutdown pod
 		allDone = false
 		delay := workerDelay
 		if ns.Role == roleControlPlane {
@@ -793,7 +1045,7 @@ func (r *ClusterShutdownReconciler) buildShutdownPod(shutdown *popv1alpha1.Clust
 			Containers: []corev1.Container{
 				{
 					Name:    "shutdown",
-					Image:   "registry.access.redhat.com/ubi9/ubi-minimal:latest",
+					Image:   defaultJobImage,
 					Command: []string{"/bin/bash", "-c"},
 					Args: []string{
 						fmt.Sprintf(`echo "Initiating shutdown of node $(hostname) in %d minute(s)..."
@@ -876,6 +1128,16 @@ func (r *ClusterShutdownReconciler) setFailed(ctx context.Context, shutdown *pop
 }
 
 func (r *ClusterShutdownReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Pod{}, "spec.nodeName", func(o client.Object) []string {
+		pod := o.(*corev1.Pod)
+		if pod.Spec.NodeName == "" {
+			return nil
+		}
+		return []string{pod.Spec.NodeName}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&popv1alpha1.ClusterShutdown{}).
 		Owns(&popv1alpha1.EtcdBackup{}).

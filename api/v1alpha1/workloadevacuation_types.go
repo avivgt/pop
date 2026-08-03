@@ -129,6 +129,9 @@ type WorkloadEvacuationStatus struct {
 	// Message provides detail about the current phase.
 	Message string `json:"message,omitempty"`
 
+	// ObservedGeneration is the most recent generation observed.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Conditions represent the latest available observations.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

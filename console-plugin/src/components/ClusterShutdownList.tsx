@@ -1,3 +1,4 @@
+import { POP_NAMESPACE } from '../constants';
 import React from 'react';
 import {
   PageSection,
@@ -16,7 +17,7 @@ import { ClusterShutdownResource } from '../types';
 import { formatTimestamp } from '../utils';
 import PhaseLabel from './shared/PhaseLabel';
 
-const NAMESPACE = 'pop-system';
+const NAMESPACE = POP_NAMESPACE;
 
 const ClusterShutdownList: React.FC = () => {
   const [clusterShutdowns, loaded, error] = useK8sWatchResource<ClusterShutdownResource[]>({
@@ -60,7 +61,7 @@ const ClusterShutdownList: React.FC = () => {
 
   return (
     <>
-      <PageSection variant="light">
+      <PageSection variant="default">
         <Breadcrumb>
           <BreadcrumbItem to="/backup-and-restore">Dashboard</BreadcrumbItem>
           <BreadcrumbItem to="/backup-and-restore/shutdown">Cluster Shutdown</BreadcrumbItem>

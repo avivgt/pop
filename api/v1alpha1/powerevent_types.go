@@ -113,6 +113,9 @@ type PowerEventStatus struct {
 	// ShutdownDeadline is when the autonomous shutdown will trigger.
 	ShutdownDeadline *metav1.Time `json:"shutdownDeadline,omitempty"`
 
+	// ObservedGeneration is the most recent generation observed.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Message provides detail about the current phase.
 	Message string `json:"message,omitempty"`
 

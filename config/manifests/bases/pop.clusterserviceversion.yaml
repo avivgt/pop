@@ -11,10 +11,23 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: AutomatedProceduresConfig configures automated power protection
+        procedures including event sources and shutdown policies.
+      displayName: Automated Procedures Config
+      kind: AutomatedProceduresConfig
+      name: automatedproceduresconfigs.pop.openshift.io
+      version: v1alpha1
     - description: BackupSchedule creates EtcdBackup CRs on a cron schedule with retention.
       displayName: Backup Schedule
       kind: BackupSchedule
       name: backupschedules.pop.openshift.io
+      version: v1alpha1
+    - description: |-
+        ClusterLifecycleConfig is the single configuration for POP cluster lifecycle management.
+        Create one instance named "default" in the operator namespace.
+      displayName: Cluster Lifecycle Config
+      kind: ClusterLifecycleConfig
+      name: clusterlifecycleconfigs.pop.openshift.io
       version: v1alpha1
     - description: |-
         ClusterRestart orchestrates bringing an OpenShift cluster back up
@@ -42,12 +55,6 @@ spec:
       displayName: Power Event
       kind: PowerEvent
       name: powerevents.pop.openshift.io
-      version: v1alpha1
-    - description: PowerProtectionConfig configures UPS/PSU-driven power protection
-        for the cluster.
-      displayName: Power Protection Config
-      kind: PowerProtectionConfig
-      name: powerprotectionconfigs.pop.openshift.io
       version: v1alpha1
     - description: |-
         WorkloadEvacuation requests ACM to migrate workloads away from this cluster,

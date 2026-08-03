@@ -502,6 +502,10 @@ spec:
                 description: LastPowerEvent is the timestamp of the last power event.
                 format: date-time
                 type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed.
+                format: int64
+                type: integer
               powerStatus:
                 description: PowerStatus is the current power state.
                 enum:

@@ -47,7 +47,7 @@ endif
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
 OPERATOR_SDK_VERSION ?= v1.39.2
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= $(IMAGE_TAG_BASE):v$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.31.0
 
@@ -111,7 +111,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 # Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
 .PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
 test-e2e:
-	go test ./test/e2e/ -v -ginkgo.v
+	go test ./test/e2e/ -tags e2e -v -ginkgo.v
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
@@ -183,6 +183,22 @@ console-plugin-image-build: ## Build console plugin container image.
 .PHONY: console-plugin-image-push
 console-plugin-image-push: ## Push console plugin container image.
 	$(CONTAINER_TOOL) push $(CONSOLE_PLUGIN_IMG)
+
+##@ Release
+
+.PHONY: release-build
+release-build: build console-plugin-build image-build console-plugin-image-build ## Build all images for release.
+	@echo "Built operator $(IMG) and console plugin $(CONSOLE_PLUGIN_IMG)"
+
+.PHONY: release-push
+release-push: image-push console-plugin-image-push ## Push all images for release.
+	@echo "Pushed operator $(IMG) and console plugin $(CONSOLE_PLUGIN_IMG)"
+
+.PHONY: release
+release: test lint lint-watches release-build release-push ## Full release: test, lint, build, push.
+	@echo "Release v$(VERSION) complete"
+
+##@ Installer
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.

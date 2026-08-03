@@ -27,6 +27,7 @@ const (
 	ClusterShutdownPhaseScheduled     ClusterShutdownPhase = "Scheduled"
 	ClusterShutdownPhaseValidating    ClusterShutdownPhase = "Validating"
 	ClusterShutdownPhaseCordoning     ClusterShutdownPhase = "Cordoning"
+	ClusterShutdownPhaseDraining      ClusterShutdownPhase = "Draining"
 	ClusterShutdownPhaseRunningHooks  ClusterShutdownPhase = "RunningHooks"
 	ClusterShutdownPhaseNotifyingApps ClusterShutdownPhase = "NotifyingApps"
 	ClusterShutdownPhaseBackingUp     ClusterShutdownPhase = "BackingUp"
@@ -150,12 +151,19 @@ type ClusterShutdownSpec struct {
 	// If set, the controller waits for evacuation to complete before shutting down.
 	// +optional
 	WorkloadEvacuationRef string `json:"workloadEvacuationRef,omitempty"`
+
+	// DrainTimeoutSeconds is the maximum time to wait for pod evictions per node.
+	// +kubebuilder:default=300
+	// +kubebuilder:validation:Minimum=30
+	// +kubebuilder:validation:Maximum=1800
+	// +optional
+	DrainTimeoutSeconds int32 `json:"drainTimeoutSeconds,omitempty"`
 }
 
 // ClusterShutdownStatus defines the observed state of ClusterShutdown.
 type ClusterShutdownStatus struct {
 	// Phase is the current phase.
-	// +kubebuilder:validation:Enum=Pending;Scheduled;Validating;Cordoning;RunningHooks;NotifyingApps;BackingUp;ShuttingDown;Complete;Failed
+	// +kubebuilder:validation:Enum=Pending;Scheduled;Validating;Cordoning;Draining;RunningHooks;NotifyingApps;BackingUp;ShuttingDown;Complete;Failed
 	Phase ClusterShutdownPhase `json:"phase,omitempty"`
 
 	// EtcdBackupRef is the name of the EtcdBackup CR created for this shutdown.
@@ -190,6 +198,9 @@ type ClusterShutdownStatus struct {
 
 	// PreflightStatus summarizes pre-flight check results.
 	PreflightStatus *PreflightStatus `json:"preflightStatus,omitempty"`
+
+	// ObservedGeneration is the most recent generation observed.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Message provides detail about the current phase.
 	Message string `json:"message,omitempty"`

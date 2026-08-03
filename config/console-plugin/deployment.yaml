@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: pop-console-plugin
-          image: image-registry.openshift-image-registry.svc:5000/pop-system/pop-console-plugin:v0.1.2
+          image: pop-console-plugin:latest
           ports:
             - containerPort: 9443
               protocol: TCP

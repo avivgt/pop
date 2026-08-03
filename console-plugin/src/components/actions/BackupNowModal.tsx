@@ -2,6 +2,9 @@ import React from 'react';
 import {
   Modal,
   ModalVariant,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
   Button,
   Alert,
 } from '@patternfly/react-core';
@@ -63,33 +66,34 @@ const BackupNowModal: React.FC<BackupNowModalProps> = ({
   return (
     <Modal
       variant={ModalVariant.small}
-      title="Trigger Backup"
       isOpen={isOpen}
       onClose={handleClose}
-      actions={[
+    >
+      <ModalHeader title="Trigger Backup" />
+      <ModalBody>
+        <p>
+          Are you sure you want to trigger an etcd backup now? The backup will be stored on
+          PVC <strong>{pvcName}</strong>.
+        </p>
+        {error && (
+          <Alert variant="danger" isInline title="Error creating backup" style={{ marginTop: 16 }}>
+            {error}
+          </Alert>
+        )}
+      </ModalBody>
+      <ModalFooter>
         <Button
-          key="confirm"
           variant="primary"
           onClick={handleConfirm}
           isLoading={isSubmitting}
           isDisabled={isSubmitting}
         >
           Backup Now
-        </Button>,
-        <Button key="cancel" variant="link" onClick={handleClose} isDisabled={isSubmitting}>
+        </Button>
+        <Button variant="link" onClick={handleClose} isDisabled={isSubmitting}>
           Cancel
-        </Button>,
-      ]}
-    >
-      <p>
-        Are you sure you want to trigger an etcd backup now? The backup will be stored on
-        PVC <strong>{pvcName}</strong>.
-      </p>
-      {error && (
-        <Alert variant="danger" isInline title="Error creating backup" style={{ marginTop: 16 }}>
-          {error}
-        </Alert>
-      )}
+        </Button>
+      </ModalFooter>
     </Modal>
   );
 };

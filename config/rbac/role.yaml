@@ -10,6 +10,7 @@ rules:
   - configmaps
   verbs:
   - create
+  - delete
   - get
   - list
   - update
@@ -57,6 +58,12 @@ rules:
   - pods/log
   verbs:
   - get
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - list
 - apiGroups:
   - apps
   resources:
@@ -110,6 +117,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - policy
+  resources:
+  - pods/eviction
+  verbs:
+  - create
 - apiGroups:
   - pop.openshift.io
   resources:
