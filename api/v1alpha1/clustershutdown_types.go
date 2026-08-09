@@ -36,6 +36,17 @@ const (
 	ClusterShutdownPhaseFailed        ClusterShutdownPhase = "Failed"
 )
 
+// ClusterType is the detected cluster topology.
+type ClusterType string
+
+const (
+	// ClusterTypeSingleNode is a single-node OpenShift cluster (SNO): one node
+	// acting as both control-plane and worker. No peer nodes to drain to.
+	ClusterTypeSingleNode ClusterType = "SingleNode"
+	// ClusterTypeMultiNode is any cluster with more than one node.
+	ClusterTypeMultiNode ClusterType = "MultiNode"
+)
+
 type ShutdownHook struct {
 	// Name is a human-readable identifier for this hook.
 	Name string `json:"name"`
@@ -177,6 +188,12 @@ type ClusterShutdownStatus struct {
 
 	// TotalNodes is the total number of nodes targeted.
 	TotalNodes int32 `json:"totalNodes,omitempty"`
+
+	// ClusterType is the detected topology: SingleNode (SNO) or MultiNode.
+	// Determines whether the drain phase performs pod eviction.
+	// +kubebuilder:validation:Enum=SingleNode;MultiNode
+	// +optional
+	ClusterType ClusterType `json:"clusterType,omitempty"`
 
 	// ShutdownNodes is the count of nodes that have been issued a shutdown command.
 	ShutdownNodes int32 `json:"shutdownNodes,omitempty"`
