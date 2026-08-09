@@ -28,8 +28,46 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	corev1 "k8s.io/api/core/v1"
+
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
 )
+
+var _ = Describe("ClusterRestart ready signal", func() {
+	ctx := context.Background()
+
+	It("emits a cluster-ready signal ConfigMap owned by the ClusterRestart", func() {
+		restart := &popv1alpha1.ClusterRestart{
+			ObjectMeta: metav1.ObjectMeta{Name: "ready-signal", Namespace: "default"},
+			Spec:       popv1alpha1.ClusterRestartSpec{},
+		}
+		Expect(k8sClient.Create(ctx, restart)).To(Succeed())
+		defer func() { _ = k8sClient.Delete(ctx, restart) }()
+
+		now := metav1.Now()
+		restart.Status.CompletionTime = &now
+
+		r := &ClusterRestartReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
+		Expect(r.ensureClusterReadySignal(ctx, restart)).To(Succeed())
+
+		cm := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "pop-cluster-ready", Namespace: "default"}, cm)).To(Succeed())
+		defer func() { _ = k8sClient.Delete(ctx, cm) }()
+
+		Expect(cm.Data["status"]).To(Equal("ready"))
+		Expect(cm.Data["restartName"]).To(Equal("ready-signal"))
+		Expect(cm.Data["completionTime"]).NotTo(BeEmpty())
+		Expect(cm.OwnerReferences).To(HaveLen(1))
+		Expect(cm.OwnerReferences[0].Name).To(Equal("ready-signal"))
+		Expect(cm.OwnerReferences[0].Kind).To(Equal("ClusterRestart"))
+
+		// Idempotent: a second call updates in place without error.
+		Expect(r.ensureClusterReadySignal(ctx, restart)).To(Succeed())
+		updated := &corev1.ConfigMap{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "pop-cluster-ready", Namespace: "default"}, updated)).To(Succeed())
+		Expect(updated.Data["status"]).To(Equal("ready"))
+	})
+})
 
 var _ = Describe("ClusterRestart Controller", func() {
 	Context("When reconciling a resource", func() {
