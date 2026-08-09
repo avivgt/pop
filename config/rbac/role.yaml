@@ -110,6 +110,16 @@ rules:
   verbs:
   - approve
 - apiGroups:
+  - cluster.open-cluster-management.io
+  resources:
+  - managedclusters
+  - placementdecisions
+  - placements
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - config.openshift.io
   resources:
   - clusteroperators
@@ -132,6 +142,7 @@ rules:
   - clusterrestarts
   - clustershutdowns
   - etcdbackups
+  - fleetshutdowns
   - powerevents
   - workloadevacuations
   verbs:
@@ -164,9 +175,22 @@ rules:
   - clusterrestarts/status
   - clustershutdowns/status
   - etcdbackups/status
+  - fleetshutdowns/status
   - powerevents/status
   - workloadevacuations/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - work.open-cluster-management.io
+  resources:
+  - manifestworks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

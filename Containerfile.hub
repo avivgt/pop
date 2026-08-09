@@ -1,0 +1,32 @@
+FROM golang:1.24 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /workspace
+COPY go.mod go.mod
+COPY go.sum go.sum
+RUN go mod download
+
+COPY cmd/hub/main.go cmd/hub/main.go
+COPY api/ api/
+COPY internal/ internal/
+
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o hub cmd/hub/main.go
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+ARG VERSION=0.2.0
+
+LABEL name="pop-hub" \
+      vendor="POP Project" \
+      version="${VERSION}" \
+      summary="POP Hub - fleet shutdown orchestrator" \
+      description="ACM hub controller that fans out per-spoke ClusterShutdown via ManifestWork" \
+      io.k8s.display-name="POP Hub" \
+      io.openshift.tags="acm,fleet,shutdown,multicluster"
+
+WORKDIR /
+COPY --from=builder /workspace/hub .
+USER 65532:65532
+
+ENTRYPOINT ["/hub"]
