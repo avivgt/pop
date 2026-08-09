@@ -170,6 +170,14 @@ spec:
                   time.
                 format: date-time
                 type: string
+              clusterType:
+                description: |-
+                  ClusterType is the detected topology: SingleNode (SNO) or MultiNode.
+                  Determines whether the drain phase performs pod eviction.
+                enum:
+                - SingleNode
+                - MultiNode
+                type: string
               completionTime:
                 description: CompletionTime is when the process completed.
                 format: date-time

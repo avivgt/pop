@@ -747,4 +747,114 @@ var _ = Describe("ClusterShutdown Controller", func() {
 			Expect(updated.Status.Phase).To(Equal(popv1alpha1.ClusterShutdownPhaseFailed))
 		})
 	})
+
+	Describe("cluster type detection", func() {
+		wipeNodes := func() {
+			list := &corev1.NodeList{}
+			Expect(k8sClient.List(ctx, list)).To(Succeed())
+			for i := range list.Items {
+				_ = k8sClient.Delete(ctx, &list.Items[i])
+			}
+			Eventually(func() int {
+				l := &corev1.NodeList{}
+				_ = k8sClient.List(ctx, l)
+				return len(l.Items)
+			}, 5*time.Second, 100*time.Millisecond).Should(Equal(0))
+		}
+
+		driveToValidating := func(name string) *popv1alpha1.ClusterShutdown {
+			s := &popv1alpha1.ClusterShutdown{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
+				Spec: popv1alpha1.ClusterShutdownSpec{
+					PVCName:       "etcd-backup",
+					SkipCertCheck: true,
+					CordonNodes:   false,
+				},
+			}
+			Expect(k8sClient.Create(ctx, s)).To(Succeed())
+			for i := 0; i < 5; i++ {
+				_, err := reconcileShutdown(name)
+				Expect(err).NotTo(HaveOccurred())
+				cur := getShutdown(name)
+				if cur.Status.ClusterType != "" {
+					return cur
+				}
+			}
+			return getShutdown(name)
+		}
+
+		AfterEach(func() {
+			wipeNodes()
+		})
+
+		It("detects a single-node cluster", func() {
+			wipeNodes()
+			createReadyNode(ctx, "sno-0", true)
+			s := driveToValidating("ct-sno")
+			Expect(s.Status.ClusterType).To(Equal(popv1alpha1.ClusterTypeSingleNode))
+			Expect(s.Status.TotalNodes).To(Equal(int32(1)))
+		})
+
+		It("detects a multi-node cluster", func() {
+			wipeNodes()
+			createReadyNode(ctx, "cp-0", true)
+			createReadyNode(ctx, "cp-1", true)
+			createReadyNode(ctx, "cp-2", true)
+			s := driveToValidating("ct-multi")
+			Expect(s.Status.ClusterType).To(Equal(popv1alpha1.ClusterTypeMultiNode))
+			Expect(s.Status.TotalNodes).To(Equal(int32(3)))
+		})
+	})
+
+	Describe("single-node drain skip", func() {
+		wipeNodes := func() {
+			list := &corev1.NodeList{}
+			Expect(k8sClient.List(ctx, list)).To(Succeed())
+			for i := range list.Items {
+				_ = k8sClient.Delete(ctx, &list.Items[i])
+			}
+			Eventually(func() int {
+				l := &corev1.NodeList{}
+				_ = k8sClient.List(ctx, l)
+				return len(l.Items)
+			}, 5*time.Second, 100*time.Millisecond).Should(Equal(0))
+		}
+
+		AfterEach(func() { wipeNodes() })
+
+		It("transitions Draining without eviction on SNO", func() {
+			wipeNodes()
+			createReadyNode(ctx, "sno-drain-0", true)
+
+			s := &popv1alpha1.ClusterShutdown{
+				ObjectMeta: metav1.ObjectMeta{Name: "sno-drain", Namespace: ns},
+				Spec: popv1alpha1.ClusterShutdownSpec{
+					PVCName:            "etcd-backup",
+					SkipCertCheck:      true,
+					CordonNodes:        false,
+					NotifyApplications: false,
+				},
+			}
+			Expect(k8sClient.Create(ctx, s)).To(Succeed())
+
+			var cur *popv1alpha1.ClusterShutdown
+			Eventually(func() popv1alpha1.ClusterShutdownPhase {
+				_, err := reconcileShutdown("sno-drain")
+				Expect(err).NotTo(HaveOccurred())
+				cur = getShutdown("sno-drain")
+				return cur.Status.Phase
+			}, 5*time.Second, 50*time.Millisecond).Should(Or(
+				Equal(popv1alpha1.ClusterShutdownPhaseRunningHooks),
+				Equal(popv1alpha1.ClusterShutdownPhaseNotifyingApps),
+				Equal(popv1alpha1.ClusterShutdownPhaseBackingUp),
+			))
+
+			cur = getShutdown("sno-drain")
+			Expect(cur.Status.ClusterType).To(Equal(popv1alpha1.ClusterTypeSingleNode))
+			for _, nodeStatus := range cur.Status.NodeStatuses {
+				Expect(nodeStatus.Status).To(Equal("Drained"))
+				Expect(nodeStatus.Message).To(ContainSubstring("single-node"))
+			}
+		})
+	})
 })

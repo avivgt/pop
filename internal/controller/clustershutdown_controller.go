@@ -252,6 +252,12 @@ func (r *ClusterShutdownReconciler) reconcileValidating(ctx context.Context, shu
 	shutdown.Status.NodeStatuses = nodeStatuses
 	shutdown.Status.TotalNodes = int32(len(nodeStatuses))
 
+	if len(nodeStatuses) == 1 {
+		shutdown.Status.ClusterType = popv1alpha1.ClusterTypeSingleNode
+	} else {
+		shutdown.Status.ClusterType = popv1alpha1.ClusterTypeMultiNode
+	}
+
 	// Check WorkloadEvacuation reference if set.
 	if shutdown.Spec.WorkloadEvacuationRef != "" {
 		evacuation := &popv1alpha1.WorkloadEvacuation{}
@@ -358,6 +364,32 @@ func (r *ClusterShutdownReconciler) reconcileDraining(ctx context.Context, shutd
 			shutdown.Status.Phase = popv1alpha1.ClusterShutdownPhaseNotifyingApps
 			shutdown.Status.Message = "Draining skipped (dry run), notifying applications"
 		}
+		if err := r.Status().Update(ctx, shutdown); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	if shutdown.Status.ClusterType == popv1alpha1.ClusterTypeSingleNode {
+		logger.Info("single-node cluster: skipping drain (no peer nodes to evict to)")
+		for i := range shutdown.Status.NodeStatuses {
+			shutdown.Status.NodeStatuses[i].Status = "Drained"
+			shutdown.Status.NodeStatuses[i].Message = "single-node: drain skipped"
+		}
+		nextPhase := popv1alpha1.ClusterShutdownPhaseRunningHooks
+		nextMessage := "Single-node cluster, skipping drain, running pre-shutdown hooks"
+		if len(shutdown.Spec.PreShutdownHooks) == 0 {
+			nextPhase = popv1alpha1.ClusterShutdownPhaseNotifyingApps
+			nextMessage = "Single-node cluster, skipping drain, notifying applications"
+		}
+		shutdown.Status.Phase = nextPhase
+		shutdown.Status.Message = nextMessage
+		meta.SetStatusCondition(&shutdown.Status.Conditions, metav1.Condition{
+			Type:    "NodesDrained",
+			Status:  metav1.ConditionTrue,
+			Reason:  "SingleNodeSkipDrain",
+			Message: "Single-node cluster: drain skipped, no peer nodes",
+		})
 		if err := r.Status().Update(ctx, shutdown); err != nil {
 			return ctrl.Result{}, err
 		}
