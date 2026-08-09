@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observability-metrics-custom-allowlist
+  namespace: open-cluster-management-observability
+data:
+  metrics_list.yaml: |
+    names:
+      - pop_power_status
+      - pop_autonomous_shutdown_countdown_seconds
+      - pop_certificate_expiry_timestamp
+      - pop_etcd_backup_last_success_timestamp
+      - pop_backup_schedule_missed_total
+      - pop_cluster_shutdown_total
+      - pop_cluster_restart_total
+      - pop_power_event_total
