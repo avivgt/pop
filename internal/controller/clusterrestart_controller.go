@@ -27,6 +27,7 @@ import (
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -55,6 +56,7 @@ type ClusterRestartReconciler struct {
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=clusterrestarts/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=clusterrestarts/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update
 // +kubebuilder:rbac:groups=certificates.k8s.io,resources=certificatesigningrequests,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=certificates.k8s.io,resources=certificatesigningrequests/approval,verbs=update
 // +kubebuilder:rbac:groups=certificates.k8s.io,resources=signers,resourceNames=kubernetes.io/kubelet-serving;kubernetes.io/kube-apiserver-client-kubelet,verbs=approve
@@ -414,6 +416,9 @@ func (r *ClusterRestartReconciler) reconcileVerifyingOperators(ctx context.Conte
 		if err := r.Status().Update(ctx, restart); err != nil {
 			return ctrl.Result{}, err
 		}
+		if err := r.ensureClusterReadySignal(ctx, restart); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -422,6 +427,64 @@ func (r *ClusterRestartReconciler) reconcileVerifyingOperators(ctx context.Conte
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+}
+
+const clusterReadySignalName = "pop-cluster-ready"
+
+// ensureClusterReadySignal publishes a ConfigMap that opt-in applications can
+// watch (e.g. via an init container) to learn the cluster platform has been
+// verified healthy after a restart. It mirrors the shutdown signal ConfigMap.
+// The ConfigMap is owned by the ClusterRestart so it is garbage-collected when
+// the ClusterRestart is deleted. Application-to-application startup ordering is
+// intentionally NOT handled here — that belongs to GitOps sync waves / app-native
+// mechanisms; POP only signals that the platform is ready.
+func (r *ClusterRestartReconciler) ensureClusterReadySignal(ctx context.Context, restart *popv1alpha1.ClusterRestart) error {
+	logger := log.FromContext(ctx)
+
+	completionTime := metav1.Now().UTC().Format(time.RFC3339)
+	if restart.Status.CompletionTime != nil {
+		completionTime = restart.Status.CompletionTime.UTC().Format(time.RFC3339)
+	}
+	data := map[string]string{
+		"status":         "ready",
+		"restartName":    restart.Name,
+		"completionTime": completionTime,
+	}
+
+	cm := &corev1.ConfigMap{}
+	key := client.ObjectKey{Name: clusterReadySignalName, Namespace: restart.Namespace}
+	err := r.Get(ctx, key, cm)
+	if apierrors.IsNotFound(err) {
+		cm = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      clusterReadySignalName,
+				Namespace: restart.Namespace,
+				Labels: map[string]string{
+					"app.kubernetes.io/managed-by": "pop-operator",
+					"pop.openshift.io/restart":     restart.Name,
+				},
+			},
+			Data: data,
+		}
+		if err := controllerutil.SetControllerReference(restart, cm, r.Scheme); err != nil {
+			return err
+		}
+		if err := r.Create(ctx, cm); err != nil {
+			return err
+		}
+		logger.Info("created cluster-ready signal ConfigMap", "name", clusterReadySignalName)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	cm.Data = data
+	if err := r.Update(ctx, cm); err != nil {
+		return err
+	}
+	logger.Info("updated cluster-ready signal ConfigMap", "name", clusterReadySignalName)
+	return nil
 }
 
 func (r *ClusterRestartReconciler) setComplete(ctx context.Context, restart *popv1alpha1.ClusterRestart, message string) (ctrl.Result, error) {
@@ -436,6 +499,9 @@ func (r *ClusterRestartReconciler) setComplete(ctx context.Context, restart *pop
 		Message: message,
 	})
 	if err := r.Status().Update(ctx, restart); err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := r.ensureClusterReadySignal(ctx, restart); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
