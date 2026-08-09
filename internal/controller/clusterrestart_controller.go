@@ -18,8 +18,11 @@ package controller
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -218,23 +221,36 @@ func (r *ClusterRestartReconciler) reconcileApprovingCSRs(ctx context.Context, r
 			continue
 		}
 
-		if restart.Spec.AutoApproveCSRs {
-			csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
-				Type:           certificatesv1.CertificateApproved,
-				Status:         corev1.ConditionTrue,
-				Reason:         "POPAutoApproved",
-				Message:        "Approved by POP operator during cluster restart",
-				LastUpdateTime: metav1.Now(),
-			})
-
-			if err := r.SubResource("approval").Update(ctx, &csr); err != nil {
-				logger.Error(err, "failed to approve CSR", "csr", csr.Name)
-				continue
-			}
-
-			logger.Info("approved CSR", "csr", csr.Name, "signerName", csr.Spec.SignerName)
-			restart.Status.ApprovedCSRs++
+		if !restart.Spec.AutoApproveCSRs {
+			continue
 		}
+
+		// Validate node identity before approving. CSRs that fail validation are
+		// left Pending for a human — never blanket-approved. This prevents an
+		// arbitrary authenticated user from obtaining a node-identity certificate
+		// during the restart approval window.
+		nodeName, valid, reason := validateKubeletCSR(&csr)
+		if !valid {
+			logger.Info("leaving CSR pending: failed node-identity validation",
+				"csr", csr.Name, "signerName", csr.Spec.SignerName, "reason", reason)
+			continue
+		}
+
+		csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+			Type:           certificatesv1.CertificateApproved,
+			Status:         corev1.ConditionTrue,
+			Reason:         "POPAutoApproved",
+			Message:        "Approved by POP operator during cluster restart after node-identity validation",
+			LastUpdateTime: metav1.Now(),
+		})
+
+		if err := r.SubResource("approval").Update(ctx, &csr); err != nil {
+			logger.Error(err, "failed to approve CSR", "csr", csr.Name)
+			continue
+		}
+
+		logger.Info("approved kubelet CSR", "csr", csr.Name, "node", nodeName, "signerName", csr.Spec.SignerName)
+		restart.Status.ApprovedCSRs++
 	}
 
 	restart.Status.Phase = popv1alpha1.ClusterRestartPhaseWaitingForWorkers
@@ -455,6 +471,94 @@ func isNodeReady(node *corev1.Node) bool {
 	for _, condition := range node.Status.Conditions {
 		if condition.Type == corev1.NodeReady {
 			return condition.Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}
+
+const (
+	nodeUserPrefix       = "system:node:"
+	nodeBootstrapperUser = "system:serviceaccount:openshift-machine-config-operator:node-bootstrapper"
+)
+
+// validateKubeletCSR parses a pending kubelet CSR and reports the node it is for
+// and whether it is safe to auto-approve. It enforces that the request carries a
+// system:node:<name> identity in the system:nodes group, with key usages
+// appropriate to its signer, and that the requester is the node itself or the
+// node-bootstrapper — never an arbitrary authenticated user. It never trusts
+// node-self-reported addresses. CSRs that fail any check are left Pending.
+func validateKubeletCSR(csr *certificatesv1.CertificateSigningRequest) (nodeName string, ok bool, reason string) {
+	block, _ := pem.Decode(csr.Spec.Request)
+	if block == nil || block.Type != "CERTIFICATE REQUEST" {
+		return "", false, "request is not a PEM certificate request"
+	}
+	cr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		return "", false, fmt.Sprintf("cannot parse certificate request: %v", err)
+	}
+	if err := cr.CheckSignature(); err != nil {
+		return "", false, fmt.Sprintf("certificate request signature invalid: %v", err)
+	}
+
+	if !strings.HasPrefix(cr.Subject.CommonName, nodeUserPrefix) {
+		return "", false, "common name is not system:node:<name>"
+	}
+	nodeName = strings.TrimPrefix(cr.Subject.CommonName, nodeUserPrefix)
+	if nodeName == "" {
+		return "", false, "empty node name in common name"
+	}
+	if !containsString(cr.Subject.Organization, "system:nodes") {
+		return nodeName, false, "certificate request is not in the system:nodes group"
+	}
+
+	switch csr.Spec.SignerName {
+	case "kubernetes.io/kube-apiserver-client-kubelet":
+		if !validKubeletUsages(csr.Spec.Usages, certificatesv1.UsageClientAuth) {
+			return nodeName, false, "unexpected key usages for a client CSR"
+		}
+		// Initial join uses the node-bootstrapper SA; renewals come from the node.
+		if csr.Spec.Username != nodeBootstrapperUser && csr.Spec.Username != cr.Subject.CommonName {
+			return nodeName, false, fmt.Sprintf("client CSR requester %q is neither the node-bootstrapper nor the node", csr.Spec.Username)
+		}
+	case "kubernetes.io/kubelet-serving":
+		if !validKubeletUsages(csr.Spec.Usages, certificatesv1.UsageServerAuth) {
+			return nodeName, false, "unexpected key usages for a serving CSR"
+		}
+		// Serving certificates are only requested by the node itself.
+		if csr.Spec.Username != cr.Subject.CommonName {
+			return nodeName, false, fmt.Sprintf("serving CSR requester %q does not match node identity %q", csr.Spec.Username, cr.Subject.CommonName)
+		}
+	default:
+		return nodeName, false, fmt.Sprintf("signer %q is not a kubelet signer", csr.Spec.SignerName)
+	}
+
+	return nodeName, true, ""
+}
+
+// validKubeletUsages returns true if usages contains the required auth usage and
+// contains only otherwise-permitted kubelet usages (never signing/CA usages).
+func validKubeletUsages(usages []certificatesv1.KeyUsage, requiredAuth certificatesv1.KeyUsage) bool {
+	allowed := map[certificatesv1.KeyUsage]bool{
+		certificatesv1.UsageDigitalSignature: true,
+		certificatesv1.UsageKeyEncipherment:  true,
+		requiredAuth:                         true,
+	}
+	hasRequired := false
+	for _, u := range usages {
+		if !allowed[u] {
+			return false
+		}
+		if u == requiredAuth {
+			hasRequired = true
+		}
+	}
+	return hasRequired
+}
+
+func containsString(s []string, target string) bool {
+	for _, v := range s {
+		if v == target {
+			return true
 		}
 	}
 	return false
