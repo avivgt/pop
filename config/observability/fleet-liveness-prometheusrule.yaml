@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pop-fleet-liveness
+  namespace: open-cluster-management
+  labels:
+    app.kubernetes.io/managed-by: pop-operator
+spec:
+  groups:
+    - name: pop-fleet-liveness
+      rules:
+        # Hub-native metric from clusterlifecycle-state-metrics, evaluated by the
+        # hub platform-monitoring Prometheus (NOT MCO/Thanos). "for" is the dark
+        # threshold; keep it below the cluster cert-recovery window.
+        - alert: PopFleetClusterDark
+          expr: acm_managed_cluster_status_condition{condition="ManagedClusterConditionAvailable",status="true"} == 0
+          for: 168h
+          labels:
+            severity: warning
+          annotations:
+            summary: "POP: managed cluster {{ $labels.managed_cluster_id }} dark >7d"
+            description: "Cluster unavailable beyond the fleet liveness threshold; approaching the cert-recovery window. Investigate before it becomes unrecoverable."
