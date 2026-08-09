@@ -58,8 +58,19 @@ for history):
   status feedback, no re-trigger loop). GitOps owns state/intent; ManifestWork
   owns the transient action. Resolves the §15 open question on fan-out.
 - **Phase 2 = two subsystems:** (2a) fleet observability (Grafana + hub
-  PrometheusRules over federated metrics — mostly config); (2b) `FleetShutdown`
-  orchestration (`cmd/hub` + CRD + controller + Placement selection + ManifestWork).
+  PrometheusRules — mostly config); (2b) `FleetShutdown` orchestration (`cmd/hub` +
+  CRD + controller + Placement selection + ManifestWork).
+- **Two hub observability stacks (verified 2026-08-09 spike).** POP's own spoke
+  metrics (power/backup) reach the hub only via the MCO
+  `observability-metrics-custom-allowlist` ConfigMap; alerts over them use the MCO
+  `thanos-ruler-custom-rules` ConfigMap; dashboards use a `grafana_dashboard`
+  ConfigMap → MCO Grafana/Alertmanager. **Fleet liveness / "dark N days" is
+  hub-native** (`acm_managed_cluster_status_condition` from
+  `clusterlifecycle-state-metrics`) and must be a `PrometheusRule` in the hub
+  **platform-monitoring** stack (`openshift-monitoring`) — a different Alertmanager.
+  The two stacks can't be joined in one expression, so "dark > N days" is a
+  standalone alert (N below the cert window). `FleetShutdown` pre-flight reads
+  `ManagedCluster` conditions directly from the hub API, not Thanos.
 
 ---
 
