@@ -36,6 +36,33 @@ the cert-recovery design substantially. Summary (details in §3.2 and §9):
 
 ---
 
+## Revision note (2026-08-09b) — Phase 2 refinements
+
+Design decisions made when kicking off Phase 2. These **supersede** the
+`FleetPowerStatus` mentions still present in §5/§6/§7.2/§8/§12 below (left inline
+for history):
+
+- **Packaging: two binaries, one repo.** Shared `api/` types; `cmd/manager`
+  (spoke) and a new `cmd/hub` (hub) deployable, each with its own image/RBAC.
+  Hub-only ACM dependencies stay out of the spoke binary.
+- **`FleetPowerStatus` is dropped.** A hub controller materializing per-cluster
+  status would just cache data that already lives on the hub: liveness in
+  `ManagedCluster` (klusterlet lease) and power/backup state in Thanos (POP
+  metrics federated via MCO). **Fleet visibility = Grafana dashboards + hub
+  `PrometheusRule`s + `ManagedCluster`**, not a bespoke CRD. Dark-duration /
+  battery / backup **alerts are hub `PrometheusRule`s**, not a controller.
+- **`FleetShutdown` = GitOps-authored intent + ManifestWork fan-out.** A human
+  commits a `FleetShutdown` CR to git → ArgoCD applies it **on the hub**
+  (auditable, versioned intent). The hub controller reconciles it and fans out a
+  per-spoke `ClusterShutdown` via **self-cleaning ManifestWork** (NAT-safe,
+  status feedback, no re-trigger loop). GitOps owns state/intent; ManifestWork
+  owns the transient action. Resolves the §15 open question on fan-out.
+- **Phase 2 = two subsystems:** (2a) fleet observability (Grafana + hub
+  PrometheusRules over federated metrics — mostly config); (2b) `FleetShutdown`
+  orchestration (`cmd/hub` + CRD + controller + Placement selection + ManifestWork).
+
+---
+
 ## 1. Context
 
 POP today is a single-cluster OpenShift operator: etcd backup, scheduled backups,
@@ -161,7 +188,9 @@ referenced in §14.
        unmanned subset: client CSRs by CN/group/usage; serving CSRs by
        renewal-continuity or operator allow-list; detector-first, bail-to-human.
 - FR6  Config + POP delivery to spokes via GitOps (git = source of truth).
-- FR7  Fleet visibility: metrics (ACM Observability) + `FleetPowerStatus` hub CRD.
+- FR7  Fleet visibility: Grafana dashboards + hub `PrometheusRule`s over federated
+       POP metrics + `ManagedCluster` liveness (no `FleetPowerStatus` CRD — see
+       Revision note 2026-08-09b).
 - FR8  Hub-orchestrated fleet operations via `FleetShutdown` (Placement-selected).
 - FR9  Black-start across 4 layers: staggered hardware power-on, cluster bring-up,
        workload ordering (`BootSequence`), cross-cluster ordering (`FleetBootSequence`).
@@ -446,9 +475,10 @@ CN/group/usage; serving CSRs by renewal-continuity or allow-list; else leave Pen
 
 ## 12. UI approach
 
-- **Phase 1 (GA):** hub-side dynamic plugin over `FleetPowerStatus` / `FleetShutdown`
-  / `FleetBootSequence` using the base SDK POP already ships; register pages/nav and
-  target the ACM Fleet Management perspective by ID. Grafana fleet dashboards via MCO.
+- **Phase 1 (GA):** Grafana fleet dashboards (via MCO) + ACM console
+  (`ManagedCluster`) for visibility; a small hub-side dynamic plugin over
+  `FleetShutdown` / `FleetBootSequence` using the base SDK, registered in the ACM
+  Fleet Management perspective. (No `FleetPowerStatus` — Revision note 2026-08-09b.)
 - **Phase 2 (optional, preview):** spoke drill-down via `@stolostron/multicluster-sdk`,
   **gated by `useIsFleetAvailable` with hub-CRD fallback**. Never a hard dependency.
 
@@ -459,8 +489,11 @@ Larger than one implementation plan. Each phase gets its own spec → plan.
 0. **Security hotfix (now)** — replace the blanket CSR approver with the safe matching
    model (`clusterrestart_controller.go`). Independent of the fleet work.
 1. **Spoke core** — cluster-type-aware shutdown + intra-cluster `BootSequence`.
-2. **Hub fleet layer** — GitOps delivery, `FleetPowerStatus` + `FleetShutdown`,
-   observability, dark-duration breach alerting, hub-CRD fleet UI.
+2. **Hub fleet layer** (new `cmd/hub` binary) — (2a) fleet observability: Grafana
+   dashboards + hub `PrometheusRule`s (battery / dark-duration breach / backup) over
+   federated metrics + `ManagedCluster` liveness; (2b) `FleetShutdown` orchestration:
+   GitOps-authored intent CR + hub controller fanning out per-spoke `ClusterShutdown`
+   via ManifestWork (Placement-selected). No `FleetPowerStatus` CRD.
 3. **Fleet black-start** — `FleetBootSequence` cross-cluster ordering + staggered
    BMC/Redfish power-on.
 4. **Optional add-ons** — secure SNO/UPI CSR-approver (+ signed allow-list) for the
