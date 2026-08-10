@@ -36,6 +36,36 @@ the cert-recovery design substantially. Summary (details in §3.2 and §9):
 
 ---
 
+## Revision note (2026-08-10) — Phase 3 refinements (black-start)
+
+Verified by the 2026-08-10 hub-power-on spike. These refine §7.3/§7.4 and the
+black-start (§9) / phasing (§13) treatment:
+
+- **Ordering is the universal core; hub power-on is an optional, gated add-on.**
+  `FleetBootSequence` core = a health-gated tier barrier: the hub observes each
+  tier become Available (`ManagedClusterConditionAvailable`, from
+  `open-cluster-management.io/api/cluster/v1`) in dependency order and only
+  releases dependent actions once its dependencies are up. Needs **zero BMC
+  access** and works for the whole fleet.
+- **Hub-driven power-on reaches only a subset and is prototype-gated.** Metal3
+  `BareMetalHost.spec.online` is idiomatic **but inert on installed ZTP spokes**
+  (the `baremetalhost.metal3.io/detached` annotation makes Ironic stop managing
+  power). The only evidence-backed path is BMHs marked `externallyProvisioned:
+  true` (power-managed, no annotation fight) — which is **one-way** and
+  deployment-specific. Decisive prototype gate: prove `externallyProvisioned:
+  true` actually powers a dark host on the target OCP/ACM version before building
+  on it. The "reattach/re-detach dance" is rejected (races assisted-service).
+- **Raw Redfish (gofish) is fallback only** for OOB-reachable non-Metal3 sites;
+  must NOT repeat `ipmi.go`'s hardcoded system id or `InsecureSkipVerify`.
+- **The NAT'd SNO/UPI far-edge majority cannot be hub-powered at all** — they use
+  BIOS restore-on-AC + the spoke-autonomous cold-start path; the hub observes
+  their recovery and gates ordering, nothing more.
+- **Phase 3 = (3a) `FleetBootSequence` ordering/health-gate (core, universal);
+  (3b) optional power-on add-on (Metal3-first, Redfish fallback), prototype-gated,
+  subset-only.** Reverses the earlier "POP staggers power-on" as a central pillar.
+
+---
+
 ## Revision note (2026-08-09b) — Phase 2 refinements
 
 Design decisions made when kicking off Phase 2. These **supersede** the
