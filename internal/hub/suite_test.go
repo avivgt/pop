@@ -33,6 +33,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 
@@ -75,6 +76,7 @@ var _ = BeforeSuite(func() {
 	Expect(popv1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
 	Expect(workv1.Install(scheme.Scheme)).To(Succeed())
 	Expect(clusterv1beta1.Install(scheme.Scheme)).To(Succeed())
+	Expect(clusterv1.Install(scheme.Scheme)).To(Succeed())
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
