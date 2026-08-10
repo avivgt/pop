@@ -1,6 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+  # Hub-only CRDs (pop.openshift.io_fleetshutdowns / _fleetbootsequences) are
+  # applied directly from config/crd/bases by the `deploy-hub` Makefile target,
+  # not listed here (kustomize forbids ../ file refs). They are deliberately NOT
+  # in the spoke OLM bundle / config/crd kustomization.
   - service_account.yaml
   - role.yaml
   - role_binding.yaml
