@@ -197,13 +197,17 @@ hub-image-push: ## Push the hub container image.
 	$(CONTAINER_TOOL) push $(HUB_IMG)
 
 .PHONY: deploy-hub
-deploy-hub: manifests kustomize ## Deploy the hub controller to the ACM hub cluster.
+deploy-hub: manifests kustomize ## Deploy the hub controller (+ hub CRDs) to the ACM hub cluster.
+	$(KUBECTL) apply -f config/crd/bases/pop.openshift.io_fleetshutdowns.yaml
+	$(KUBECTL) apply -f config/crd/bases/pop.openshift.io_fleetbootsequences.yaml
 	cd config/hub && $(KUSTOMIZE) edit set image openshift.io/pop-hub=$(HUB_IMG)
 	$(KUSTOMIZE) build config/hub | $(KUBECTL) apply -f -
 
 .PHONY: undeploy-hub
 undeploy-hub: kustomize ## Remove the hub controller from the ACM hub cluster.
 	$(KUSTOMIZE) build config/hub | $(KUBECTL) delete --ignore-not-found=true -f -
+	$(KUBECTL) delete --ignore-not-found=true -f config/crd/bases/pop.openshift.io_fleetshutdowns.yaml
+	$(KUBECTL) delete --ignore-not-found=true -f config/crd/bases/pop.openshift.io_fleetbootsequences.yaml
 
 ##@ Release
 
