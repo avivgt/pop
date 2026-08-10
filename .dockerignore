@@ -5,3 +5,5 @@ bin/
 .claude/
 .remember/
 docs/
+.git/
+console-plugin/node_modules/
