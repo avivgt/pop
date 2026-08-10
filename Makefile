@@ -184,6 +184,27 @@ console-plugin-image-build: ## Build console plugin container image.
 console-plugin-image-push: ## Push console plugin container image.
 	$(CONTAINER_TOOL) push $(CONSOLE_PLUGIN_IMG)
 
+##@ Hub (ACM fleet controller)
+
+HUB_IMG ?= $(IMAGE_TAG_BASE)-hub:v$(VERSION)
+
+.PHONY: hub-image-build
+hub-image-build: ## Build the hub (cmd/hub) container image.
+	$(CONTAINER_TOOL) build -f Containerfile.hub -t $(HUB_IMG) .
+
+.PHONY: hub-image-push
+hub-image-push: ## Push the hub container image.
+	$(CONTAINER_TOOL) push $(HUB_IMG)
+
+.PHONY: deploy-hub
+deploy-hub: manifests kustomize ## Deploy the hub controller to the ACM hub cluster.
+	cd config/hub && $(KUSTOMIZE) edit set image openshift.io/pop-hub=$(HUB_IMG)
+	$(KUSTOMIZE) build config/hub | $(KUBECTL) apply -f -
+
+.PHONY: undeploy-hub
+undeploy-hub: kustomize ## Remove the hub controller from the ACM hub cluster.
+	$(KUSTOMIZE) build config/hub | $(KUBECTL) delete --ignore-not-found=true -f -
+
 ##@ Release
 
 .PHONY: release-build

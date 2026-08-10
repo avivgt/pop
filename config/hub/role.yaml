@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pop-hub-role
+rules:
+  - apiGroups: ["pop.openshift.io"]
+    resources: ["fleetshutdowns"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["pop.openshift.io"]
+    resources: ["fleetshutdowns/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["cluster.open-cluster-management.io"]
+    resources: ["placements", "placementdecisions", "managedclusters"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["work.open-cluster-management.io"]
+    resources: ["manifestworks"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
