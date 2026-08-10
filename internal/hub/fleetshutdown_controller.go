@@ -48,10 +48,10 @@ type FleetShutdownReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=pop.openshift.io,resources=fleetshutdowns,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=pop.openshift.io,resources=fleetshutdowns/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=cluster.open-cluster-management.io,resources=placements;placementdecisions;managedclusters,verbs=get;list;watch
-// +kubebuilder:rbac:groups=work.open-cluster-management.io,resources=manifestworks,verbs=get;list;watch;create;update;patch;delete
+// NOTE: RBAC for the hub controller is hand-maintained in config/hub/role.yaml
+// (a distinct ClusterRole for the cmd/hub deployable), NOT via +kubebuilder:rbac
+// markers — those aggregate into the spoke manager-role and would over-permission
+// the spoke operator with fleet/ManifestWork/Placement access it must not have.
 
 func (r *FleetShutdownReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
