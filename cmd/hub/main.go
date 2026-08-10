@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 
@@ -49,6 +50,7 @@ func init() {
 	utilruntime.Must(popv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workv1.Install(scheme))
 	utilruntime.Must(clusterv1beta1.Install(scheme))
+	utilruntime.Must(clusterv1.Install(scheme))
 }
 
 func main() {
@@ -80,6 +82,14 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FleetShutdown")
+		os.Exit(1)
+	}
+
+	if err := (&hub.FleetBootSequenceReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "FleetBootSequence")
 		os.Exit(1)
 	}
 

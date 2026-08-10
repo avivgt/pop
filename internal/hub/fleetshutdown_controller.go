@@ -28,14 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	workv1 "open-cluster-management.io/api/work/v1"
 
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
 )
-
-// placementLabel links a PlacementDecision to its Placement.
-const placementLabel = "cluster.open-cluster-management.io/placement"
 
 // spokeNamespace is the namespace on each managed cluster where POP runs and
 // where the fanned-out ClusterShutdown is applied.
@@ -138,22 +134,9 @@ func (r *FleetShutdownReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 }
 
 // resolvePlacement returns the managed-cluster names selected by the named
-// Placement, read from its PlacementDecision(s).
+// Placement (see resolvePlacementDecisions in placement.go).
 func (r *FleetShutdownReconciler) resolvePlacement(ctx context.Context, ns, name string) ([]string, error) {
-	pdList := &clusterv1beta1.PlacementDecisionList{}
-	if err := r.List(ctx, pdList,
-		client.InNamespace(ns),
-		client.MatchingLabels{placementLabel: name},
-	); err != nil {
-		return nil, err
-	}
-	var names []string
-	for i := range pdList.Items {
-		for _, d := range pdList.Items[i].Status.Decisions {
-			names = append(names, d.ClusterName)
-		}
-	}
-	return names, nil
+	return resolvePlacementDecisions(ctx, r.Client, ns, name)
 }
 
 // ensureManifestWork creates the ManifestWork wrapping a ClusterShutdown for the
