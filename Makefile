@@ -26,7 +26,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 # IMAGE_TAG_BASE defines the registry namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
-IMAGE_TAG_BASE ?= openshift.io/pop
+IMAGE_TAG_BASE ?= quay.io/aguetta/pop
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -47,7 +47,7 @@ endif
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
 OPERATOR_SDK_VERSION ?= v1.39.2
 # Image URL to use all building/pushing image targets
-IMG ?= $(IMAGE_TAG_BASE):v$(VERSION)
+IMG ?= $(IMAGE_TAG_BASE)-operator:v$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.31.0
 
@@ -341,6 +341,24 @@ bundle-build: ## Build the bundle image.
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	$(MAKE) image-push IMG=$(BUNDLE_IMG)
+
+# HUB_BUNDLE_IMG defines the image:tag for the hub operator bundle.
+HUB_BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-hub-bundle:v$(VERSION)
+
+.PHONY: hub-bundle-build
+hub-bundle-build: ## Build the hub operator bundle image (bundle-hub/).
+	$(CONTAINER_TOOL) build -f bundle-hub.Dockerfile -t $(HUB_BUNDLE_IMG) .
+
+.PHONY: hub-bundle-push
+hub-bundle-push: ## Push the hub operator bundle image.
+	$(MAKE) image-push IMG=$(HUB_BUNDLE_IMG)
+
+.PHONY: hub-bundle-validate
+hub-bundle-validate: operator-sdk ## Validate the hand-authored hub bundle.
+	$(OPERATOR_SDK) bundle validate ./bundle-hub
+
+# Build a catalog containing BOTH operator bundles (spoke + hub):
+#   make catalog-build CATALOG_IMG=... BUNDLE_IMGS=$(BUNDLE_IMG),$(HUB_BUNDLE_IMG)
 
 .PHONY: opm
 OPM = $(LOCALBIN)/opm

@@ -70,6 +70,14 @@ spec:
                 default: true
                 description: CordonNodes when true cordons all nodes before shutdown.
                 type: boolean
+              drainTimeoutSeconds:
+                default: 300
+                description: DrainTimeoutSeconds is the maximum time to wait for pod
+                  evictions per node.
+                format: int32
+                maximum: 1800
+                minimum: 30
+                type: integer
               dryRun:
                 default: false
                 description: |-
@@ -161,6 +169,14 @@ spec:
                 description: CertificateExpiry is the detected certificate expiry
                   time.
                 format: date-time
+                type: string
+              clusterType:
+                description: |-
+                  ClusterType is the detected topology: SingleNode (SNO) or MultiNode.
+                  Determines whether the drain phase performs pod eviction.
+                enum:
+                - SingleNode
+                - MultiNode
                 type: string
               completionTime:
                 description: CompletionTime is when the process completed.
@@ -289,6 +305,10 @@ spec:
                   - status
                   type: object
                 type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed.
+                format: int64
+                type: integer
               phase:
                 description: Phase is the current phase.
                 enum:
@@ -296,6 +316,7 @@ spec:
                 - Scheduled
                 - Validating
                 - Cordoning
+                - Draining
                 - RunningHooks
                 - NotifyingApps
                 - BackingUp

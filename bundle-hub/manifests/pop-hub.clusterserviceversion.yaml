@@ -1,0 +1,160 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "pop.openshift.io/v1alpha1",
+          "kind": "FleetShutdown",
+          "metadata": {"name": "example"},
+          "spec": {"placementRef": "edge-tier-1", "pvcName": "etcd-backup", "reason": "maintenance"}
+        },
+        {
+          "apiVersion": "pop.openshift.io/v1alpha1",
+          "kind": "FleetBootSequence",
+          "metadata": {"name": "example"},
+          "spec": {"tiers": [{"name": "shared-services", "placementRef": "hub-region"}, {"name": "edge", "placementRef": "edge-tier-1", "dependsOn": ["shared-services"]}]}
+        }
+      ]
+    capabilities: Basic Install
+    categories: OpenShift Optional
+    description: Hub-side fleet controller for POP - orchestrates FleetShutdown and FleetBootSequence across ACM-managed clusters.
+  name: pop-hub-operator.v0.2.0
+  namespace: placeholder
+spec:
+  displayName: POP Hub Operator
+  description: |
+    The POP Hub Operator runs on an ACM hub and orchestrates fleet-wide power
+    lifecycle across managed clusters:
+
+    - **FleetShutdown**: selects clusters via an ACM Placement and fans out a
+      per-spoke ClusterShutdown through ManifestWork, aggregating status.
+    - **FleetBootSequence**: health-gated cross-cluster black-start ordering,
+      gated on ManagedClusterConditionAvailable.
+
+    Install this on the ACM hub only. It depends on ACM (open-cluster-management)
+    CRDs: ManagedCluster, Placement/PlacementDecision, ManifestWork. The spoke
+    operator (pop-operator) is a separate bundle installed on managed clusters.
+  provider:
+    name: POP Project
+  maturity: alpha
+  version: 0.2.0
+  minKubeVersion: 1.28.0
+  keywords:
+    - acm
+    - multicluster
+    - fleet
+    - shutdown
+    - black-start
+  links:
+    - name: Design
+      url: https://github.com/avivgt/pop
+  installModes:
+    - type: OwnNamespace
+      supported: true
+    - type: SingleNamespace
+      supported: true
+    - type: MultiNamespace
+      supported: false
+    - type: AllNamespaces
+      supported: true
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+      - name: fleetshutdowns.pop.openshift.io
+        kind: FleetShutdown
+        version: v1alpha1
+        displayName: Fleet Shutdown
+        description: FleetShutdown gracefully shuts down a Placement-selected set of managed clusters via ManifestWork.
+      - name: fleetbootsequences.pop.openshift.io
+        kind: FleetBootSequence
+        version: v1alpha1
+        displayName: Fleet Boot Sequence
+        description: FleetBootSequence performs health-gated, dependency-ordered fleet black-start.
+  install:
+    strategy: deployment
+    spec:
+      clusterPermissions:
+        - serviceAccountName: pop-hub
+          rules:
+            - apiGroups: ["pop.openshift.io"]
+              resources: ["fleetshutdowns"]
+              verbs: ["get", "list", "watch", "update", "patch"]
+            - apiGroups: ["pop.openshift.io"]
+              resources: ["fleetshutdowns/status"]
+              verbs: ["get", "update", "patch"]
+            - apiGroups: ["pop.openshift.io"]
+              resources: ["fleetbootsequences"]
+              verbs: ["get", "list", "watch", "update", "patch"]
+            - apiGroups: ["pop.openshift.io"]
+              resources: ["fleetbootsequences/status"]
+              verbs: ["get", "update", "patch"]
+            - apiGroups: ["cluster.open-cluster-management.io"]
+              resources: ["placements", "placementdecisions", "managedclusters"]
+              verbs: ["get", "list", "watch"]
+            - apiGroups: ["work.open-cluster-management.io"]
+              resources: ["manifestworks"]
+              verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+            - apiGroups: ["coordination.k8s.io"]
+              resources: ["leases"]
+              verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+            - apiGroups: [""]
+              resources: ["events"]
+              verbs: ["create", "patch"]
+      deployments:
+        - name: pop-hub
+          label:
+            app.kubernetes.io/name: pop-hub
+            app.kubernetes.io/managed-by: pop-operator
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: pop-hub
+            template:
+              metadata:
+                labels:
+                  app.kubernetes.io/name: pop-hub
+              spec:
+                serviceAccountName: pop-hub
+                securityContext:
+                  runAsNonRoot: true
+                  seccompProfile:
+                    type: RuntimeDefault
+                containers:
+                  - name: hub
+                    image: quay.io/aguetta/pop-hub:v0.2.0
+                    args:
+                      - --leader-elect
+                      - --health-probe-bind-address=:8081
+                      - --metrics-bind-address=:8080
+                    ports:
+                      - name: metrics
+                        containerPort: 8080
+                      - name: health
+                        containerPort: 8081
+                    livenessProbe:
+                      httpGet:
+                        path: /healthz
+                        port: 8081
+                      initialDelaySeconds: 15
+                      periodSeconds: 20
+                    readinessProbe:
+                      httpGet:
+                        path: /readyz
+                        port: 8081
+                      initialDelaySeconds: 5
+                      periodSeconds: 10
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      readOnlyRootFilesystem: true
+                      capabilities:
+                        drop: ["ALL"]
+                    resources:
+                      requests:
+                        cpu: 10m
+                        memory: 64Mi
+                      limits:
+                        cpu: 500m
+                        memory: 256Mi
