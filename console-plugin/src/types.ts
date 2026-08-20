@@ -253,3 +253,86 @@ export interface PowerEventResource extends K8sResourceCommon {
     message?: string;
   };
 }
+
+// --- FleetShutdown ---
+
+export interface FleetClusterStatus {
+  name: string;
+  phase?: string;
+  message?: string;
+}
+
+export interface FleetShutdownResource extends K8sResourceCommon {
+  spec?: {
+    placementRef?: string;
+    pvcName?: string;
+    reason?: string;
+    dryRun?: boolean;
+    shutdownPolicy?: {
+      onStuck?: string;
+      hardDeadlineSeconds?: number;
+    };
+  };
+  status?: {
+    phase?: string;
+    clusters?: FleetClusterStatus[];
+    selectedClusters?: number;
+    completedClusters?: number;
+    message?: string;
+    conditions?: Array<{ type: string; status: string; reason: string; message: string }>;
+  };
+}
+
+// --- FleetBootSequence ---
+
+export interface FleetBootTierStatus {
+  name: string;
+  ready: boolean;
+  clustersTotal?: number;
+  clustersReady?: number;
+  message?: string;
+}
+
+export interface FleetBootSequenceResource extends K8sResourceCommon {
+  spec?: {
+    tiers?: Array<{
+      name: string;
+      placementRef: string;
+      dependsOn?: string[];
+      timeoutSeconds?: number;
+    }>;
+  };
+  status?: {
+    phase?: string;
+    tiers?: FleetBootTierStatus[];
+    startTime?: string;
+    message?: string;
+  };
+}
+
+// --- ManagedCluster ---
+
+export interface ManagedClusterClaim {
+  name: string;
+  value: string;
+}
+
+export interface ManagedClusterResource extends K8sResourceCommon {
+  spec?: {
+    hubAcceptsClient?: boolean;
+  };
+  status?: {
+    conditions?: Array<{ type: string; status: string; reason?: string; message?: string }>;
+    clusterClaims?: ManagedClusterClaim[];
+    version?: { kubernetes?: string };
+  };
+}
+
+// --- Placement ---
+
+export interface PlacementResource extends K8sResourceCommon {
+  status?: {
+    numberOfSelectedClusters?: number;
+    conditions?: Array<{ type: string; status: string }>;
+  };
+}

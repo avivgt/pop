@@ -44,6 +44,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	clusterv1alpha1 "open-cluster-management.io/api/cluster/v1alpha1"
+
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
 	"github.com/avivgt/pop/internal/alert"
 	"github.com/avivgt/pop/internal/controller"
@@ -62,6 +64,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(popv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(clusterv1alpha1.Install(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

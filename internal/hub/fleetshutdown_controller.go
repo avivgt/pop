@@ -59,7 +59,8 @@ func (r *FleetShutdownReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	fs.Status.ObservedGeneration = fs.Generation
 
-	if fs.Status.Phase == popv1alpha1.FleetShutdownPhaseCompleted {
+	if fs.Status.Phase == popv1alpha1.FleetShutdownPhaseCompleted ||
+		fs.Status.Phase == popv1alpha1.FleetShutdownPhasePartiallyFailed {
 		return ctrl.Result{}, nil
 	}
 

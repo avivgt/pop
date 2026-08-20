@@ -138,7 +138,7 @@ lint-watches: ## Check that dashboard pages don't use excessive K8s list watches
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+	go build -ldflags "-X github.com/avivgt/pop/internal/version.Version=$(VERSION)" -o bin/manager cmd/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
@@ -208,6 +208,32 @@ undeploy-hub: kustomize ## Remove the hub controller from the ACM hub cluster.
 	$(KUSTOMIZE) build config/hub | $(KUBECTL) delete --ignore-not-found=true -f -
 	$(KUBECTL) delete --ignore-not-found=true -f config/crd/bases/pop.openshift.io_fleetshutdowns.yaml
 	$(KUBECTL) delete --ignore-not-found=true -f config/crd/bases/pop.openshift.io_fleetbootsequences.yaml
+
+##@ ACM Integration
+
+.PHONY: deploy-acm-foundation
+deploy-acm-foundation: kustomize ## Deploy ACM foundation (ManagedClusterSetBinding + Placement) to the hub.
+	$(KUSTOMIZE) build config/acm/foundation | $(KUBECTL) apply -f -
+	$(KUBECTL) label managedcluster local-cluster pop.openshift.io/enabled=true --overwrite
+
+.PHONY: undeploy-acm-foundation
+undeploy-acm-foundation: kustomize ## Remove ACM foundation resources from the hub.
+	$(KUBECTL) label managedcluster local-cluster pop.openshift.io/enabled- --ignore-not-found=true
+	$(KUSTOMIZE) build config/acm/foundation | $(KUBECTL) delete --ignore-not-found=true -f -
+
+.PHONY: deploy-acm-policy
+deploy-acm-policy: kustomize ## Deploy ACM Policy for automatic POP spoke deployment to managed clusters.
+	$(KUSTOMIZE) build config/acm/policy | $(KUBECTL) apply -f -
+
+.PHONY: undeploy-acm-policy
+undeploy-acm-policy: kustomize ## Remove ACM Policy for POP spoke deployment.
+	$(KUSTOMIZE) build config/acm/policy | $(KUBECTL) delete --ignore-not-found=true -f -
+
+.PHONY: deploy-acm
+deploy-acm: deploy-acm-foundation deploy-acm-policy ## Deploy all ACM integration resources.
+
+.PHONY: undeploy-acm
+undeploy-acm: undeploy-acm-policy undeploy-acm-foundation ## Remove all ACM integration resources.
 
 ##@ Release
 

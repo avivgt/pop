@@ -35,6 +35,7 @@ import (
 
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
 	popmetrics "github.com/avivgt/pop/internal/metrics"
+	"github.com/avivgt/pop/internal/version"
 )
 
 type ClusterLifecycleConfigReconciler struct {
@@ -51,6 +52,7 @@ type ClusterLifecycleConfigReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups=cluster.open-cluster-management.io,resources=clusterclaims,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ClusterLifecycleConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
@@ -99,6 +101,17 @@ func (r *ClusterLifecycleConfigReconciler) Reconcile(ctx context.Context, req ct
 
 	if err := r.Status().Update(ctx, config); err != nil {
 		return ctrl.Result{}, err
+	}
+
+	lastBackup := ""
+	if config.Status.Backup.LastBackupTime != nil {
+		lastBackup = config.Status.Backup.LastBackupTime.Format(time.RFC3339)
+	}
+	if err := ensureClusterClaim(ctx, r.Client, ClaimLastBackupTime, lastBackup); err != nil {
+		logger.V(1).Error(err, "failed to update last-backup-time ClusterClaim")
+	}
+	if err := ensureClusterClaim(ctx, r.Client, ClaimOperatorVersion, version.Version); err != nil {
+		logger.V(1).Error(err, "failed to update operator-version ClusterClaim")
 	}
 
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
