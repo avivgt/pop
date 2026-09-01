@@ -165,6 +165,10 @@ func (r *AutomatedProceduresConfigReconciler) Reconcile(ctx context.Context, req
 		return ctrl.Result{}, err
 	}
 
+	if err := ensureClusterClaim(ctx, r.Client, ClaimPowerStatus, string(config.Status.PowerStatus)); err != nil {
+		logger.V(1).Error(err, "failed to update power-status ClusterClaim")
+	}
+
 	return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 }
 

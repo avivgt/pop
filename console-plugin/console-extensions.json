@@ -230,5 +230,125 @@
       "abbr": "POP",
       "color": "#0066CC"
     }
+  },
+  {
+    "type": "console.flag/model",
+    "properties": {
+      "model": {
+        "group": "pop.openshift.io",
+        "version": "v1alpha1",
+        "kind": "FleetShutdown"
+      },
+      "flag": "POP_HUB_ENABLED"
+    }
+  },
+  {
+    "type": "console.navigation/section",
+    "properties": {
+      "id": "pop-fleet-operations",
+      "perspective": "acm",
+      "name": "Fleet Operations",
+      "insertAfter": "acm-governance"
+    },
+    "flags": {
+      "required": ["POP_HUB_ENABLED"]
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "pop-fleet-dashboard",
+      "perspective": "acm",
+      "section": "pop-fleet-operations",
+      "name": "Fleet Dashboard",
+      "href": "/multicloud/fleet-operations"
+    },
+    "flags": {
+      "required": ["POP_HUB_ENABLED"]
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "pop-fleet-shutdowns",
+      "perspective": "acm",
+      "section": "pop-fleet-operations",
+      "name": "Fleet Shutdowns",
+      "href": "/multicloud/fleet-operations/shutdowns",
+      "insertAfter": "pop-fleet-dashboard"
+    },
+    "flags": {
+      "required": ["POP_HUB_ENABLED"]
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "pop-fleet-boot-sequences",
+      "perspective": "acm",
+      "section": "pop-fleet-operations",
+      "name": "Boot Sequences",
+      "href": "/multicloud/fleet-operations/boot-sequences",
+      "insertAfter": "pop-fleet-shutdowns"
+    },
+    "flags": {
+      "required": ["POP_HUB_ENABLED"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/multicloud/fleet-operations",
+      "exact": true,
+      "perspective": "acm",
+      "component": {
+        "$codeRef": "FleetDashboardPage"
+      }
+    },
+    "flags": {
+      "required": ["POP_HUB_ENABLED"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/multicloud/fleet-operations/shutdowns",
+      "exact": true,
+      "perspective": "acm",
+      "component": {
+        "$codeRef": "FleetShutdownList"
+      }
+    },
+    "flags": {
+      "required": ["POP_HUB_ENABLED"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/multicloud/fleet-operations/shutdowns/create",
+      "exact": true,
+      "perspective": "acm",
+      "component": {
+        "$codeRef": "FleetShutdownCreate"
+      }
+    },
+    "flags": {
+      "required": ["POP_HUB_ENABLED"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/multicloud/fleet-operations/boot-sequences",
+      "exact": true,
+      "perspective": "acm",
+      "component": {
+        "$codeRef": "FleetBootSequenceList"
+      }
+    },
+    "flags": {
+      "required": ["POP_HUB_ENABLED"]
+    }
   }
 ]

@@ -22,7 +22,11 @@
       "EtcdBackupList": "./components/EtcdBackupList",
       "ClusterShutdownList": "./components/ClusterShutdownList",
       "ClusterRestartList": "./components/ClusterRestartList",
-      "BackupScheduleList": "./components/BackupScheduleList"
+      "BackupScheduleList": "./components/BackupScheduleList",
+      "FleetDashboardPage": "./components/FleetDashboardPage",
+      "FleetShutdownList": "./components/FleetShutdownList",
+      "FleetShutdownCreate": "./components/FleetShutdownCreate",
+      "FleetBootSequenceList": "./components/FleetBootSequenceList"
     },
     "dependencies": {
       "@console/pluginAPI": "*"

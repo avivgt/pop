@@ -11,7 +11,8 @@ COPY cmd/main.go cmd/main.go
 COPY api/ api/
 COPY internal/ internal/
 
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
+ARG VERSION=0.2.0
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -ldflags "-X github.com/avivgt/pop/internal/version.Version=${VERSION}" -a -o manager cmd/main.go
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 

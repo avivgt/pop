@@ -76,3 +76,49 @@ export const PowerEventModel: K8sModel = {
   abbr: 'PE',
   namespaced: true,
 };
+
+// --- Fleet / Hub models ---
+
+export const FleetShutdownModel: K8sModel = {
+  apiGroup: 'pop.openshift.io',
+  apiVersion: 'v1alpha1',
+  kind: 'FleetShutdown',
+  plural: 'fleetshutdowns',
+  label: 'FleetShutdown',
+  labelPlural: 'FleetShutdowns',
+  abbr: 'FS',
+  namespaced: true,
+};
+
+export const FleetBootSequenceModel: K8sModel = {
+  apiGroup: 'pop.openshift.io',
+  apiVersion: 'v1alpha1',
+  kind: 'FleetBootSequence',
+  plural: 'fleetbootsequences',
+  label: 'FleetBootSequence',
+  labelPlural: 'FleetBootSequences',
+  abbr: 'FBS',
+  namespaced: true,
+};
+
+export const ManagedClusterModel: K8sModel = {
+  apiGroup: 'cluster.open-cluster-management.io',
+  apiVersion: 'v1',
+  kind: 'ManagedCluster',
+  plural: 'managedclusters',
+  label: 'ManagedCluster',
+  labelPlural: 'ManagedClusters',
+  abbr: 'MC',
+  namespaced: false,
+};
+
+export const PlacementModel: K8sModel = {
+  apiGroup: 'cluster.open-cluster-management.io',
+  apiVersion: 'v1beta1',
+  kind: 'Placement',
+  plural: 'placements',
+  label: 'Placement',
+  labelPlural: 'Placements',
+  abbr: 'PL',
+  namespaced: true,
+};

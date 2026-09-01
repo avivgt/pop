@@ -21,6 +21,7 @@ export function phaseToColor(
     case 'Active':
       return 'green';
     case 'Failed':
+    case 'PartiallyFailed':
       return 'red';
     case 'Running':
     case 'ShuttingDown':
@@ -29,8 +30,10 @@ export function phaseToColor(
     case 'WaitingForControlPlane':
     case 'WaitingForWorkers':
     case 'VerifyingOperators':
+    case 'InProgress':
       return 'blue';
     case 'Suspended':
+    case 'TimedOut':
       return 'orange';
     case 'Validating':
       return 'teal';
@@ -54,6 +57,7 @@ export function phaseToIcon(phase: string): React.ComponentType {
     case 'Running':
     case 'ShuttingDown':
     case 'BackingUp':
+    case 'InProgress':
       return InProgressIcon;
     case 'ApprovingCSRs':
     case 'WaitingForControlPlane':
@@ -61,7 +65,10 @@ export function phaseToIcon(phase: string): React.ComponentType {
     case 'VerifyingOperators':
       return SyncAltIcon;
     case 'Suspended':
+    case 'TimedOut':
       return PauseCircleIcon;
+    case 'PartiallyFailed':
+      return ExclamationCircleIcon;
     case 'Validating':
       return OutlinedClockIcon;
     case 'Pending':
@@ -119,6 +126,15 @@ export function formatTimestamp(ts: string | undefined): string {
   const diffYears = Math.floor(diffMonths / 12);
   const label = diffYears === 1 ? 'year' : 'years';
   return isFuture ? `in ${diffYears} ${label}` : `${diffYears} ${label} ago`;
+}
+
+import { ManagedClusterClaim } from './types';
+
+/**
+ * Extracts a ClusterClaim value by name from a list of claims.
+ */
+export function getClusterClaim(claims: ManagedClusterClaim[] | undefined, name: string): string {
+  return claims?.find((c) => c.name === name)?.value ?? '';
 }
 
 /**

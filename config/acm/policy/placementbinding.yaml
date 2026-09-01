@@ -1,0 +1,13 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: pop-spoke-deployment-binding
+  namespace: pop-system
+placementRef:
+  apiGroup: cluster.open-cluster-management.io
+  kind: Placement
+  name: pop-all-clusters
+subjects:
+  - apiGroup: policy.open-cluster-management.io
+    kind: Policy
+    name: pop-spoke-deployment
