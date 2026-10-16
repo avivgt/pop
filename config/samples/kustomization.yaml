@@ -8,4 +8,5 @@ resources:
 - pop_v1alpha1_powerevent.yaml
 - pop_v1alpha1_workloadevacuation.yaml
 - pop_v1alpha1_clusterlifecycleconfig.yaml
+- pop_v1alpha1_bootsequence.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

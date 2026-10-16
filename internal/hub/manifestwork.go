@@ -72,6 +72,7 @@ func buildManifestWork(clusterName, fleetShutdownName string, cs *popv1alpha1.Cl
 							JsonPaths: []workv1.JsonPath{
 								{Name: "phase", Path: ".status.phase"},
 								{Name: "message", Path: ".status.message"},
+								{Name: "backupRef", Path: ".status.etcdBackupRef"},
 							},
 						},
 					},
@@ -97,4 +98,10 @@ func feedbackString(mw *workv1.ManifestWork, name string) string {
 // phaseFromFeedback returns the wrapped ClusterShutdown's status.phase.
 func phaseFromFeedback(mw *workv1.ManifestWork) string {
 	return feedbackString(mw, "phase")
+}
+
+// backupRefFromFeedback returns the wrapped ClusterShutdown's
+// status.etcdBackupRef (the EtcdBackup CR name), or "" if not reported yet.
+func backupRefFromFeedback(mw *workv1.ManifestWork) string {
+	return feedbackString(mw, "backupRef")
 }

@@ -10,6 +10,7 @@ resources:
 - bases/pop.openshift.io_powerevents.yaml
 - bases/pop.openshift.io_workloadevacuations.yaml
 - bases/pop.openshift.io_clusterlifecycleconfigs.yaml
+- bases/pop.openshift.io_bootsequences.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

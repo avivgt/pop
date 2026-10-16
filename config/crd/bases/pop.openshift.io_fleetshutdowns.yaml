@@ -106,6 +106,12 @@ spec:
                     FleetClusterStatus is the per-cluster shutdown progress, aggregated from the
                     ManifestWork status feedback of each spoke's ClusterShutdown.
                   properties:
+                    backupRef:
+                      description: |-
+                        BackupRef is the EtcdBackup CR name taken on this spoke before shutdown,
+                        surfaced from the spoke ClusterShutdown's status.etcdBackupRef via
+                        ManifestWork feedback. Empty until the spoke reports it.
+                      type: string
                     message:
                       type: string
                     name:

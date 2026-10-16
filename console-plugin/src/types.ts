@@ -260,6 +260,7 @@ export interface FleetClusterStatus {
   name: string;
   phase?: string;
   message?: string;
+  backupRef?: string;
 }
 
 export interface FleetShutdownResource extends K8sResourceCommon {

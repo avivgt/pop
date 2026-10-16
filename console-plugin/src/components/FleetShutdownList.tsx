@@ -1,5 +1,5 @@
 import { POP_NAMESPACE } from '../constants';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   PageSection,
   Title,
@@ -12,7 +12,15 @@ import {
   ToolbarContent,
   ToolbarItem,
 } from '@patternfly/react-core';
-import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
+import {
+  Table,
+  Thead,
+  Tr,
+  Th,
+  Tbody,
+  Td,
+  ExpandableRowContent,
+} from '@patternfly/react-table';
 import { useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
 import { FleetShutdownModel } from '../models';
 import { FleetShutdownResource } from '../types';
@@ -32,6 +40,8 @@ const FleetShutdownList: React.FC = () => {
     isList: true,
     namespaced: true,
   });
+
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   if (!loaded) {
     return (
@@ -84,42 +94,103 @@ const FleetShutdownList: React.FC = () => {
           <Table aria-label="FleetShutdowns table" variant="compact">
             <Thead>
               <Tr>
+                <Th screenReaderText="Row expansion" />
                 <Th>Name</Th>
                 <Th>Phase</Th>
                 <Th>Placement</Th>
                 <Th>Selected</Th>
                 <Th>Completed</Th>
+                <Th>Backups</Th>
                 <Th>Reason</Th>
                 <Th>DryRun</Th>
                 <Th>Age</Th>
               </Tr>
             </Thead>
-            <Tbody>
-              {sorted.map((fs) => (
-                <Tr key={fs.metadata?.uid}>
-                  <Td dataLabel="Name">{fs.metadata?.name || '-'}</Td>
-                  <Td dataLabel="Phase">
-                    <PhaseLabel phase={fs.status?.phase} />
-                  </Td>
-                  <Td dataLabel="Placement">{fs.spec?.placementRef || '-'}</Td>
-                  <Td dataLabel="Selected">
-                    {fs.status?.selectedClusters !== undefined ? String(fs.status.selectedClusters) : '-'}
-                  </Td>
-                  <Td dataLabel="Completed">
-                    {fs.status?.completedClusters !== undefined
-                      ? `${fs.status.completedClusters}/${fs.status.selectedClusters ?? '-'}`
-                      : '-'}
-                  </Td>
-                  <Td dataLabel="Reason">{fs.spec?.reason || '-'}</Td>
-                  <Td dataLabel="DryRun">
-                    {fs.spec?.dryRun !== undefined ? String(fs.spec.dryRun) : '-'}
-                  </Td>
-                  <Td dataLabel="Age">
-                    {formatTimestamp(fs.metadata?.creationTimestamp)}
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
+            {sorted.map((fs, rowIndex) => {
+              const key = fs.metadata?.uid || fs.metadata?.name || String(rowIndex);
+              const clusters = fs.status?.clusters || [];
+              const backedUp = clusters.filter((c) => !!c.backupRef).length;
+              const isExpanded = !!expanded[key];
+              return (
+                <Tbody key={key} isExpanded={isExpanded}>
+                  <Tr>
+                    <Td
+                      expand={
+                        clusters.length > 0
+                          ? {
+                              rowIndex,
+                              isExpanded,
+                              onToggle: () =>
+                                setExpanded((prev) => ({ ...prev, [key]: !prev[key] })),
+                              expandId: `fs-expand-${key}`,
+                            }
+                          : undefined
+                      }
+                    />
+                    <Td dataLabel="Name">{fs.metadata?.name || '-'}</Td>
+                    <Td dataLabel="Phase">
+                      <PhaseLabel phase={fs.status?.phase} />
+                    </Td>
+                    <Td dataLabel="Placement">{fs.spec?.placementRef || '-'}</Td>
+                    <Td dataLabel="Selected">
+                      {fs.status?.selectedClusters !== undefined
+                        ? String(fs.status.selectedClusters)
+                        : '-'}
+                    </Td>
+                    <Td dataLabel="Completed">
+                      {fs.status?.completedClusters !== undefined
+                        ? `${fs.status.completedClusters}/${fs.status.selectedClusters ?? '-'}`
+                        : '-'}
+                    </Td>
+                    <Td dataLabel="Backups">
+                      {clusters.length > 0
+                        ? `${backedUp}/${clusters.length}`
+                        : '-'}
+                    </Td>
+                    <Td dataLabel="Reason">{fs.spec?.reason || '-'}</Td>
+                    <Td dataLabel="DryRun">
+                      {fs.spec?.dryRun !== undefined ? String(fs.spec.dryRun) : '-'}
+                    </Td>
+                    <Td dataLabel="Age">{formatTimestamp(fs.metadata?.creationTimestamp)}</Td>
+                  </Tr>
+                  {clusters.length > 0 && (
+                    <Tr isExpanded={isExpanded}>
+                      <Td />
+                      <Td dataLabel="Per-cluster detail" colSpan={9}>
+                        <ExpandableRowContent>
+                          <Table
+                            aria-label={`Per-cluster detail for ${fs.metadata?.name}`}
+                            variant="compact"
+                            borders={false}
+                          >
+                            <Thead>
+                              <Tr>
+                                <Th>Cluster</Th>
+                                <Th>Phase</Th>
+                                <Th>Etcd Backup</Th>
+                                <Th>Message</Th>
+                              </Tr>
+                            </Thead>
+                            <Tbody>
+                              {clusters.map((c) => (
+                                <Tr key={c.name}>
+                                  <Td dataLabel="Cluster">{c.name}</Td>
+                                  <Td dataLabel="Phase">
+                                    <PhaseLabel phase={c.phase} />
+                                  </Td>
+                                  <Td dataLabel="Etcd Backup">{c.backupRef || '-'}</Td>
+                                  <Td dataLabel="Message">{c.message || '-'}</Td>
+                                </Tr>
+                              ))}
+                            </Tbody>
+                          </Table>
+                        </ExpandableRowContent>
+                      </Td>
+                    </Tr>
+                  )}
+                </Tbody>
+              );
+            })}
           </Table>
         )}
       </PageSection>

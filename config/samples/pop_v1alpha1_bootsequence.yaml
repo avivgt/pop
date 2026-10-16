@@ -1,0 +1,33 @@
+apiVersion: pop.openshift.io/v1alpha1
+kind: BootSequence
+metadata:
+  name: bootsequence-sample
+  namespace: pop-system
+spec:
+  stages:
+    - name: storage
+      selector:
+        namespaces:
+          - openshift-storage
+      healthGate: AllPodsReady
+      timeoutSeconds: 600
+      onStuck: haltAndAlert
+    - name: networking
+      selector:
+        namespaces:
+          - openshift-ovn-kubernetes
+      dependsOn:
+        - storage
+    - name: data-services
+      selector:
+        namespaces:
+          - data-services
+      dependsOn:
+        - networking
+    - name: apps
+      selector:
+        namespaces:
+          - apps
+      dependsOn:
+        - data-services
+      onStuck: force
