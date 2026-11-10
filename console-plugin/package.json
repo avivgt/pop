@@ -1,6 +1,6 @@
 {
   "name": "pop-console-plugin",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "scripts": {
     "build": "webpack --config webpack.config.js --mode=production",
@@ -10,7 +10,7 @@
   },
   "consolePlugin": {
     "name": "pop-console-plugin",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "displayName": "POP - Power Outage Provisioner",
     "description": "Manage etcd backups and cluster lifecycle operations",
     "exposedModules": {
