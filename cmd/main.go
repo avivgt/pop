@@ -233,6 +233,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterLifecycleConfig")
 		os.Exit(1)
 	}
+	if err = (&controller.BootSequenceReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BootSequence")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	var alertPort int32 = 8082

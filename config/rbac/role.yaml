@@ -140,6 +140,7 @@ rules:
   resources:
   - automatedproceduresconfigs
   - backupschedules
+  - bootsequences
   - clusterlifecycleconfigs
   - clusterrestarts
   - clustershutdowns
@@ -159,6 +160,7 @@ rules:
   resources:
   - automatedproceduresconfigs/finalizers
   - backupschedules/finalizers
+  - bootsequences/finalizers
   - clusterlifecycleconfigs/finalizers
   - clusterrestarts/finalizers
   - clustershutdowns/finalizers
@@ -172,6 +174,7 @@ rules:
   resources:
   - automatedproceduresconfigs/status
   - backupschedules/status
+  - bootsequences/status
   - clusterlifecycleconfigs/status
   - clusterrestarts/status
   - clustershutdowns/status

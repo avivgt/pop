@@ -72,6 +72,11 @@ type FleetClusterStatus struct {
 	Name    string `json:"name"`
 	Phase   string `json:"phase,omitempty"`
 	Message string `json:"message,omitempty"`
+
+	// BackupRef is the EtcdBackup CR name taken on this spoke before shutdown,
+	// surfaced from the spoke ClusterShutdown's status.etcdBackupRef via
+	// ManifestWork feedback. Empty until the spoke reports it.
+	BackupRef string `json:"backupRef,omitempty"`
 }
 
 // FleetShutdownStatus defines the observed state of FleetShutdown.

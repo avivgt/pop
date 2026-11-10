@@ -92,8 +92,8 @@ func (r *FleetShutdownReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	statuses := make([]popv1alpha1.FleetClusterStatus, 0, len(clusters))
 	completed, failed := 0, 0
 	for _, clusterName := range clusters {
-		phase, msg := r.clusterPhase(ctx, fs.Name, clusterName)
-		statuses = append(statuses, popv1alpha1.FleetClusterStatus{Name: clusterName, Phase: phase, Message: msg})
+		phase, msg, backupRef := r.clusterPhase(ctx, fs.Name, clusterName)
+		statuses = append(statuses, popv1alpha1.FleetClusterStatus{Name: clusterName, Phase: phase, Message: msg, BackupRef: backupRef})
 		switch phase {
 		case string(popv1alpha1.ClusterShutdownPhaseComplete):
 			completed++
@@ -169,13 +169,13 @@ func (r *FleetShutdownReconciler) ensureManifestWork(ctx context.Context, fs *po
 }
 
 // clusterPhase returns the wrapped ClusterShutdown phase + message for a cluster.
-func (r *FleetShutdownReconciler) clusterPhase(ctx context.Context, fsName, clusterName string) (string, string) {
+func (r *FleetShutdownReconciler) clusterPhase(ctx context.Context, fsName, clusterName string) (phase, message, backupRef string) {
 	mw := &workv1.ManifestWork{}
 	key := client.ObjectKey{Name: manifestWorkName(fsName), Namespace: clusterName}
 	if err := r.Get(ctx, key, mw); err != nil {
-		return "", "pending: ManifestWork not found"
+		return "", "pending: ManifestWork not found", ""
 	}
-	return phaseFromFeedback(mw), feedbackString(mw, "message")
+	return phaseFromFeedback(mw), feedbackString(mw, "message"), backupRefFromFeedback(mw)
 }
 
 // cleanupManifestWorks deletes the fanned-out ManifestWorks once terminal.

@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o hu
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 
-ARG VERSION=0.2.0
+ARG VERSION=0.2.1
 
 LABEL name="pop-hub" \
       vendor="POP Project" \
