@@ -19,21 +19,27 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	popv1alpha1 "github.com/avivgt/pop/api/v1alpha1"
 )
 
 const (
-	bootStageOnStuckForce = "force"
+	bootStageOnStuckForce   = "force"
+	bootStageDefaultTimeout = int32(600)
 )
 
 // BootSequenceReconciler walks a BootSequence's stages in dependency order,
@@ -48,110 +54,164 @@ type BootSequenceReconciler struct {
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=bootsequences,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=bootsequences/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=pop.openshift.io,resources=bootsequences/finalizers,verbs=update
+// +kubebuilder:rbac:groups=pop.openshift.io,resources=clusterrestarts,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 
 func (r *BootSequenceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-
 	bs := &popv1alpha1.BootSequence{}
 	if err := r.Get(ctx, req.NamespacedName, bs); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	bs.Status.ObservedGeneration = bs.Generation
-
-	if bs.Status.Phase == popv1alpha1.BootSequencePhaseComplete ||
-		bs.Status.Phase == popv1alpha1.BootSequencePhaseTimedOut ||
-		bs.Status.Phase == popv1alpha1.BootSequencePhaseFailed {
+	restartUID, err := r.latestClusterRestartUID(ctx)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if r.syncRun(bs, restartUID) {
 		return ctrl.Result{}, nil
 	}
 
+	order, err := topoSortStages(bs.Spec.Stages)
+	if err != nil {
+		return r.markInvalid(ctx, bs, err)
+	}
+	meta.SetStatusCondition(&bs.Status.Conditions, metav1.Condition{
+		Type: "Valid", Status: metav1.ConditionTrue, Reason: "ValidStages", Message: "stage DAG is valid",
+	})
+
+	statuses, allReady, timedOut, err := r.evaluateStages(ctx, bs, order)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	bs.Status.Stages = statuses
+	return r.writePhase(ctx, bs, allReady, timedOut)
+}
+
+func (r *BootSequenceReconciler) syncRun(bs *popv1alpha1.BootSequence, restartUID string) (done bool) {
+	specChanged := bs.Status.ObservedGeneration != 0 && bs.Generation != bs.Status.ObservedGeneration
+	newRestart := restartUID != "" && restartUID != bs.Status.LastClusterRestartUID
+	if specChanged || (bootSequenceTerminal(bs.Status.Phase) && newRestart) {
+		resetBootSequenceStatus(bs)
+		bs.Status.LastClusterRestartUID = restartUID
+	} else if bootSequenceTerminal(bs.Status.Phase) {
+		return true
+	}
+	if bs.Status.LastClusterRestartUID == "" && restartUID != "" {
+		bs.Status.LastClusterRestartUID = restartUID
+	}
+	bs.Status.ObservedGeneration = bs.Generation
 	if bs.Status.StartTime == nil {
 		now := metav1.Now()
 		bs.Status.StartTime = &now
 		bs.Status.Phase = popv1alpha1.BootSequencePhaseInProgress
 	}
+	return false
+}
 
-	order, err := topoSortStages(bs.Spec.Stages)
-	if err != nil {
-		bs.Status.Phase = popv1alpha1.BootSequencePhaseFailed
-		bs.Status.Message = fmt.Sprintf("invalid stages: %v", err)
-		meta.SetStatusCondition(&bs.Status.Conditions, metav1.Condition{
-			Type: "Valid", Status: metav1.ConditionFalse, Reason: "InvalidStages", Message: err.Error(),
-		})
-		if uerr := r.Status().Update(ctx, bs); uerr != nil {
-			return ctrl.Result{}, uerr
-		}
-		return ctrl.Result{}, nil // spec error: wait for the user to fix it
+func (r *BootSequenceReconciler) markInvalid(ctx context.Context, bs *popv1alpha1.BootSequence, err error) (ctrl.Result, error) {
+	bs.Status.Message = fmt.Sprintf("invalid stages: %v", err)
+	meta.SetStatusCondition(&bs.Status.Conditions, metav1.Condition{
+		Type: "Valid", Status: metav1.ConditionFalse, Reason: "InvalidStages", Message: err.Error(),
+	})
+	if uerr := r.Status().Update(ctx, bs); uerr != nil {
+		return ctrl.Result{}, uerr
 	}
+	return ctrl.Result{}, nil
+}
 
+func (r *BootSequenceReconciler) evaluateStages(ctx context.Context, bs *popv1alpha1.BootSequence, order []string) ([]popv1alpha1.BootStageStatus, bool, bool, error) {
 	byName := make(map[string]popv1alpha1.BootStage, len(bs.Spec.Stages))
 	for _, s := range bs.Spec.Stages {
 		byName[s.Name] = s
 	}
+	prevEligible := map[string]*metav1.Time{}
+	for _, s := range bs.Status.Stages {
+		if s.EligibleSince != nil {
+			prevEligible[s.Name] = s.EligibleSince
+		}
+	}
 
 	readyByName := make(map[string]bool, len(order))
 	statuses := make([]popv1alpha1.BootStageStatus, 0, len(order))
-	elapsed := time.Since(bs.Status.StartTime.Time)
 	allReady, timedOut := true, false
-
 	for _, name := range order {
-		stage := byName[name]
-
-		depsReady := true
-		for _, dep := range stage.DependsOn {
-			if !readyByName[dep] {
-				depsReady = false
-				break
-			}
+		st, stageTimedOut, err := r.evaluateStage(ctx, byName[name], readyByName, prevEligible)
+		if err != nil {
+			return nil, false, false, err
 		}
-
-		total, ready := 0, 0
-		msg := ""
-		gatePassed := false
-		if !depsReady {
-			msg = "waiting on dependencies"
-		} else {
-			t, rdy, gerr := r.evaluateHealthGate(ctx, stage)
-			if gerr != nil {
-				return ctrl.Result{}, gerr
-			}
-			total, ready = t, rdy
-			gatePassed = ready == total // AllPodsReady (0 pods => trivially satisfied)
-			if gatePassed {
-				msg = fmt.Sprintf("%d/%d pods ready", ready, total)
-			} else {
-				msg = fmt.Sprintf("%d/%d pods ready, waiting", ready, total)
-			}
+		if stageTimedOut {
+			timedOut = true
 		}
-
-		forced := false
-		stageReady := depsReady && gatePassed
-		if !stageReady && depsReady && int32(elapsed.Seconds()) > stage.TimeoutSeconds {
-			if stage.OnStuck == bootStageOnStuckForce {
-				stageReady = true
-				forced = true
-				msg = fmt.Sprintf("forced ready after %ds timeout (%d/%d pods ready)",
-					stage.TimeoutSeconds, ready, total)
-			} else {
-				timedOut = true
-				msg = fmt.Sprintf("timed out after %ds (%d/%d pods ready)",
-					stage.TimeoutSeconds, ready, total)
-			}
-		}
-
-		readyByName[name] = stageReady
-		if !stageReady {
+		readyByName[name] = st.Ready
+		if !st.Ready {
 			allReady = false
 		}
-		statuses = append(statuses, popv1alpha1.BootStageStatus{
-			Name: name, Ready: stageReady, Forced: forced,
-			PodsTotal: int32(total), PodsReady: int32(ready), Message: msg,
-		})
+		statuses = append(statuses, st)
+	}
+	return statuses, allReady, timedOut, nil
+}
+
+func (r *BootSequenceReconciler) evaluateStage(ctx context.Context, stage popv1alpha1.BootStage, readyByName map[string]bool, prevEligible map[string]*metav1.Time) (popv1alpha1.BootStageStatus, bool, error) {
+	depsReady := true
+	for _, dep := range stage.DependsOn {
+		if !readyByName[dep] {
+			depsReady = false
+			break
+		}
 	}
 
-	bs.Status.Stages = statuses
+	st := popv1alpha1.BootStageStatus{Name: stage.Name}
+	if !depsReady {
+		st.Message = "waiting on dependencies"
+		return st, false, nil
+	}
 
+	if prev, ok := prevEligible[stage.Name]; ok {
+		st.EligibleSince = prev
+	} else {
+		now := metav1.Now()
+		st.EligibleSince = &now
+	}
+
+	total, ready, missing, err := r.evaluateHealthGate(ctx, stage)
+	if err != nil {
+		return st, false, err
+	}
+	st.PodsTotal, st.PodsReady = int32(total), int32(ready)
+	gatePassed := false
+	switch {
+	case len(missing) > 0:
+		st.Message = "namespace " + strings.Join(missing, ", ") + " not found"
+	case total == 0:
+		st.Message = "waiting for workloads (0 pods)"
+	case ready == total:
+		gatePassed = true
+		st.Message = fmt.Sprintf("%d/%d pods ready", ready, total)
+	default:
+		st.Message = fmt.Sprintf("%d/%d pods ready, waiting", ready, total)
+	}
+
+	st.Ready = gatePassed
+	timeout := stage.TimeoutSeconds
+	if timeout <= 0 {
+		timeout = bootStageDefaultTimeout
+	}
+	if !st.Ready && time.Since(st.EligibleSince.Time) > time.Duration(timeout)*time.Second {
+		if stage.OnStuck == bootStageOnStuckForce {
+			st.Ready = true
+			st.Forced = true
+			st.Message = fmt.Sprintf("forced ready after %ds timeout (%d/%d pods ready)", timeout, ready, total)
+			return st, false, nil
+		}
+		st.Message = fmt.Sprintf("timed out after %ds (%d/%d pods ready)", timeout, ready, total)
+		return st, true, nil
+	}
+	return st, false, nil
+}
+
+func (r *BootSequenceReconciler) writePhase(ctx context.Context, bs *popv1alpha1.BootSequence, allReady, timedOut bool) (ctrl.Result, error) {
+	logger := log.FromContext(ctx)
 	switch {
 	case timedOut:
 		bs.Status.Phase = popv1alpha1.BootSequencePhaseTimedOut
@@ -159,44 +219,73 @@ func (r *BootSequenceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		meta.SetStatusCondition(&bs.Status.Conditions, metav1.Condition{
 			Type: "Complete", Status: metav1.ConditionFalse, Reason: "StageTimeout", Message: bs.Status.Message,
 		})
-		if err := r.Status().Update(ctx, bs); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.Status().Update(ctx, bs)
 	case allReady:
 		bs.Status.Phase = popv1alpha1.BootSequencePhaseComplete
 		bs.Status.Message = "All stages ready"
 		meta.SetStatusCondition(&bs.Status.Conditions, metav1.Condition{
 			Type: "Complete", Status: metav1.ConditionTrue, Reason: "AllStagesReady", Message: "All stages ready",
 		})
-		if err := r.Status().Update(ctx, bs); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.Status().Update(ctx, bs)
 	default:
 		bs.Status.Phase = popv1alpha1.BootSequencePhaseInProgress
 		bs.Status.Message = "Workload black-start in progress"
 		if err := r.Status().Update(ctx, bs); err != nil {
 			return ctrl.Result{}, err
 		}
-		logger.V(1).Info("boot sequence in progress", "stages", len(statuses))
+		logger.V(1).Info("boot sequence in progress", "stages", len(bs.Status.Stages))
 		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	}
 }
 
-// evaluateHealthGate returns (totalPods, readyPods) across the stage's selected
-// namespaces, counting only pods that are not already terminal (Succeeded/Failed).
-// A pod is ready when its PodReady condition is True.
-func (r *BootSequenceReconciler) evaluateHealthGate(ctx context.Context, stage popv1alpha1.BootStage) (total, ready int, err error) {
+func bootSequenceTerminal(phase popv1alpha1.BootSequencePhase) bool {
+	return phase == popv1alpha1.BootSequencePhaseComplete ||
+		phase == popv1alpha1.BootSequencePhaseTimedOut
+}
+
+func resetBootSequenceStatus(bs *popv1alpha1.BootSequence) {
+	bs.Status = popv1alpha1.BootSequenceStatus{}
+}
+
+func (r *BootSequenceReconciler) latestClusterRestartUID(ctx context.Context) (string, error) {
+	list := &popv1alpha1.ClusterRestartList{}
+	if err := r.List(ctx, list); err != nil {
+		return "", err
+	}
+	var latest *popv1alpha1.ClusterRestart
+	for i := range list.Items {
+		cr := &list.Items[i]
+		if latest == nil || cr.CreationTimestamp.After(latest.CreationTimestamp.Time) {
+			latest = cr
+		}
+	}
+	if latest == nil {
+		return "", nil
+	}
+	return string(latest.UID), nil
+}
+
+// evaluateHealthGate returns (totalPods, readyPods, missingNamespaces) across
+// the stage's selected namespaces, counting only pods that are not already
+// terminal (Succeeded/Failed). A pod is ready when its PodReady condition is True.
+func (r *BootSequenceReconciler) evaluateHealthGate(ctx context.Context, stage popv1alpha1.BootStage) (total, ready int, missing []string, err error) {
 	for _, ns := range stage.Selector.Namespaces {
+		namespace := &corev1.Namespace{}
+		if gerr := r.Get(ctx, types.NamespacedName{Name: ns}, namespace); gerr != nil {
+			if apierrors.IsNotFound(gerr) {
+				missing = append(missing, ns)
+				continue
+			}
+			return 0, 0, nil, gerr
+		}
 		podList := &corev1.PodList{}
 		if lerr := r.List(ctx, podList, client.InNamespace(ns)); lerr != nil {
-			return 0, 0, lerr
+			return 0, 0, nil, lerr
 		}
 		for i := range podList.Items {
 			pod := &podList.Items[i]
 			if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
-				continue // completed pods (jobs, one-shots) are not gating
+				continue
 			}
 			total++
 			if podReady(pod) {
@@ -204,7 +293,7 @@ func (r *BootSequenceReconciler) evaluateHealthGate(ctx context.Context, stage p
 			}
 		}
 	}
-	return total, ready, nil
+	return total, ready, missing, nil
 }
 
 // podReady reports whether the pod's PodReady condition is True.
@@ -273,5 +362,20 @@ func topoSortStages(stages []popv1alpha1.BootStage) ([]string, error) {
 func (r *BootSequenceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&popv1alpha1.BootSequence{}).
+		Watches(&popv1alpha1.ClusterRestart{}, handler.EnqueueRequestsFromMapFunc(r.enqueueAllBootSequences)).
 		Complete(r)
+}
+
+func (r *BootSequenceReconciler) enqueueAllBootSequences(ctx context.Context, _ client.Object) []reconcile.Request {
+	list := &popv1alpha1.BootSequenceList{}
+	if err := r.List(ctx, list); err != nil {
+		return nil
+	}
+	reqs := make([]reconcile.Request, 0, len(list.Items))
+	for i := range list.Items {
+		reqs = append(reqs, reconcile.Request{NamespacedName: types.NamespacedName{
+			Name: list.Items[i].Name, Namespace: list.Items[i].Namespace,
+		}})
+	}
+	return reqs
 }

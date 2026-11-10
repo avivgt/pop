@@ -49,8 +49,9 @@ type BootStage struct {
 	Selector BootStageSelector `json:"selector"`
 
 	// HealthGate is the readiness condition that must hold before dependent
-	// stages are released. AllPodsReady: every non-completed pod in the selected
-	// namespaces is Ready (namespaces with no pods are trivially satisfied).
+	// stages are considered Ready. AllPodsReady: every selected namespace
+	// exists and has at least one non-completed pod, and every such pod is
+	// Ready. Empty or missing namespaces do not pass.
 	// +kubebuilder:validation:Enum=AllPodsReady
 	// +kubebuilder:default=AllPodsReady
 	// +optional
@@ -87,12 +88,17 @@ type BootSequenceSpec struct {
 
 // BootStageStatus is the observed readiness of a stage.
 type BootStageStatus struct {
-	Name       string `json:"name"`
-	Ready      bool   `json:"ready"`
-	Forced     bool   `json:"forced,omitempty"`
-	PodsTotal  int32  `json:"podsTotal"`
-	PodsReady  int32  `json:"podsReady"`
-	Message    string `json:"message,omitempty"`
+	Name      string `json:"name"`
+	Ready     bool   `json:"ready"`
+	Forced    bool   `json:"forced,omitempty"`
+	PodsTotal int32  `json:"podsTotal"`
+	PodsReady int32  `json:"podsReady"`
+	Message   string `json:"message,omitempty"`
+
+	// EligibleSince is when this stage's dependencies first became Ready.
+	// TimeoutSeconds is measured from this instant, not from sequence start.
+	// +optional
+	EligibleSince *metav1.Time `json:"eligibleSince,omitempty"`
 }
 
 // BootSequenceStatus defines the observed state of BootSequence.
@@ -106,6 +112,11 @@ type BootSequenceStatus struct {
 
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// LastClusterRestartUID is the ClusterRestart that started this run.
+	// A newer ClusterRestart UID re-runs a standing (GitOps) BootSequence.
+	// +optional
+	LastClusterRestartUID string `json:"lastClusterRestartUID,omitempty"`
+
 	Message string `json:"message,omitempty"`
 
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -116,10 +127,11 @@ type BootSequenceStatus struct {
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// BootSequence declares an ordered, health-gated intra-cluster workload
-// black-start: the spoke operator releases each stage only once its dependencies
-// satisfy their health gate (e.g. storage Ready before apps). It is the
-// workload-layer complement to the hub's cross-cluster FleetBootSequence.
+// BootSequence is standing GitOps config that observes an ordered, health-gated
+// intra-cluster workload black-start (e.g. storage Ready before apps). It does
+// not scale or hold workloads; it reports whether selected namespaces become
+// Ready in DAG order. A new ClusterRestart re-runs a completed sequence.
+// It is the workload-layer complement to the hub's FleetBootSequence.
 type BootSequence struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

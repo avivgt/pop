@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/aguetta/pop-operator
-  newTag: v0.2.1
+  newTag: v0.2.2

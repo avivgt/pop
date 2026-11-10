@@ -308,7 +308,7 @@ metadata:
     createdAt: "2026-10-19T05:18:54Z"
     operators.operatorframework.io/builder: operator-sdk-v1.39.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-  name: pop.v0.2.1
+  name: pop.v0.2.2
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -604,7 +604,7 @@ spec:
                 - --health-probe-bind-address=:8081
                 command:
                 - /manager
-                image: quay.io/aguetta/pop-operator:v0.2.1
+                image: quay.io/aguetta/pop-operator:v0.2.2
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -691,5 +691,5 @@ spec:
   maturity: alpha
   provider:
     name: POP Project
-  replaces: pop.v0.2.0
-  version: 0.2.1
+  replaces: pop.v0.2.1
+  version: 0.2.2
