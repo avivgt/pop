@@ -95,8 +95,8 @@ spec:
   - maintenance
   - lifecycle
   maintainers:
-  - email: avivgt@redhat.com
-    name: Aviv GT
+  - email: @avivgt
+    name: Aviv Guetta
   maturity: alpha
   provider:
     name: POP Project
