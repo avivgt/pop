@@ -10,6 +10,8 @@ entries:
   - name: pop.v0.2.0
   - name: pop.v0.2.1
     replaces: pop.v0.2.0
+  - name: pop.v0.2.2
+    replaces: pop.v0.2.1
 ---
 schema: olm.package
 name: pop-hub-operator
@@ -22,6 +24,8 @@ entries:
   - name: pop-hub-operator.v0.2.0
   - name: pop-hub-operator.v0.2.1
     replaces: pop-hub-operator.v0.2.0
+  - name: pop-hub-operator.v0.2.2
+    replaces: pop-hub-operator.v0.2.1
 ---
 image: quay.io/aguetta/pop-bundle:v0.2.0
 name: pop.v0.2.0

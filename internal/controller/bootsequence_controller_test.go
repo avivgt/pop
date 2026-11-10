@@ -125,15 +125,17 @@ var _ = Describe("BootSequence Controller", func() {
 		reconciler = &BootSequenceReconciler{Client: k8sClient, Scheme: k8sClient.Scheme()}
 	})
 
-	reconcileBS := func(name, ns string) (reconcile.Result, error) {
+	const bsNS = "default"
+
+	reconcileBS := func(name string) (reconcile.Result, error) {
 		return reconciler.Reconcile(ctx, reconcile.Request{
-			NamespacedName: types.NamespacedName{Name: name, Namespace: ns},
+			NamespacedName: types.NamespacedName{Name: name, Namespace: bsNS},
 		})
 	}
 
-	getBS := func(name, ns string) *popv1alpha1.BootSequence {
+	getBS := func(name string) *popv1alpha1.BootSequence {
 		bs := &popv1alpha1.BootSequence{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, bs)).To(Succeed())
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: bsNS}, bs)).To(Succeed())
 		return bs
 	}
 
@@ -155,10 +157,10 @@ var _ = Describe("BootSequence Controller", func() {
 		Expect(k8sClient.Create(ctx, bs)).To(Succeed())
 		defer func() { _ = k8sClient.Delete(ctx, bs) }()
 
-		_, err := reconcileBS("empty-ns", "default")
+		_, err := reconcileBS("empty-ns")
 		Expect(err).NotTo(HaveOccurred())
 
-		got := getBS("empty-ns", "default")
+		got := getBS("empty-ns")
 		Expect(got.Status.Phase).To(Equal(popv1alpha1.BootSequencePhaseInProgress))
 		Expect(stageByName(got.Status.Stages, "storage").Ready).To(BeFalse())
 		Expect(stageByName(got.Status.Stages, "storage").PodsTotal).To(Equal(int32(0)))
@@ -178,10 +180,10 @@ var _ = Describe("BootSequence Controller", func() {
 		Expect(k8sClient.Create(ctx, bs)).To(Succeed())
 		defer func() { _ = k8sClient.Delete(ctx, bs) }()
 
-		_, err := reconcileBS("missing-ns", "default")
+		_, err := reconcileBS("missing-ns")
 		Expect(err).NotTo(HaveOccurred())
 
-		got := getBS("missing-ns", "default")
+		got := getBS("missing-ns")
 		Expect(got.Status.Phase).To(Equal(popv1alpha1.BootSequencePhaseInProgress))
 		Expect(stageByName(got.Status.Stages, "storage").Ready).To(BeFalse())
 		Expect(stageByName(got.Status.Stages, "storage").Message).To(ContainSubstring("does-not-exist-bs"))
@@ -211,9 +213,9 @@ var _ = Describe("BootSequence Controller", func() {
 		Expect(k8sClient.Create(ctx, bs)).To(Succeed())
 		defer func() { _ = k8sClient.Delete(ctx, bs) }()
 
-		_, err := reconcileBS("ordered", "default")
+		_, err := reconcileBS("ordered")
 		Expect(err).NotTo(HaveOccurred())
-		got := getBS("ordered", "default")
+		got := getBS("ordered")
 		Expect(got.Status.Phase).To(Equal(popv1alpha1.BootSequencePhaseInProgress))
 		Expect(stageByName(got.Status.Stages, "storage").Ready).To(BeFalse())
 		Expect(stageByName(got.Status.Stages, "apps").Ready).To(BeFalse())
@@ -224,9 +226,9 @@ var _ = Describe("BootSequence Controller", func() {
 		ceph.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}}
 		Expect(k8sClient.Status().Update(ctx, ceph)).To(Succeed())
 
-		_, err = reconcileBS("ordered", "default")
+		_, err = reconcileBS("ordered")
 		Expect(err).NotTo(HaveOccurred())
-		got = getBS("ordered", "default")
+		got = getBS("ordered")
 		Expect(got.Status.Phase).To(Equal(popv1alpha1.BootSequencePhaseComplete))
 		Expect(stageByName(got.Status.Stages, "storage").Ready).To(BeTrue())
 		Expect(stageByName(got.Status.Stages, "apps").Ready).To(BeTrue())
@@ -251,9 +253,9 @@ var _ = Describe("BootSequence Controller", func() {
 		Expect(k8sClient.Create(ctx, bs)).To(Succeed())
 		defer func() { _ = k8sClient.Delete(ctx, bs) }()
 
-		_, err := reconcileBS("cycle-fix", "default")
+		_, err := reconcileBS("cycle-fix")
 		Expect(err).NotTo(HaveOccurred())
-		got := getBS("cycle-fix", "default")
+		got := getBS("cycle-fix")
 		Expect(got.Status.Phase).NotTo(Equal(popv1alpha1.BootSequencePhaseFailed))
 		Expect(got.Status.Message).To(ContainSubstring("cycle"))
 
@@ -262,9 +264,9 @@ var _ = Describe("BootSequence Controller", func() {
 		}}
 		Expect(k8sClient.Update(ctx, got)).To(Succeed())
 
-		_, err = reconcileBS("cycle-fix", "default")
+		_, err = reconcileBS("cycle-fix")
 		Expect(err).NotTo(HaveOccurred())
-		got = getBS("cycle-fix", "default")
+		got = getBS("cycle-fix")
 		Expect(got.Status.Phase).To(Equal(popv1alpha1.BootSequencePhaseComplete))
 	})
 
@@ -288,15 +290,15 @@ var _ = Describe("BootSequence Controller", func() {
 		Expect(k8sClient.Create(ctx, bs)).To(Succeed())
 		defer func() { _ = k8sClient.Delete(ctx, bs) }()
 
-		_, err := reconcileBS("rerun", "default")
+		_, err := reconcileBS("rerun")
 		Expect(err).NotTo(HaveOccurred())
-		got := getBS("rerun", "default")
+		got := getBS("rerun")
 		Expect(got.Status.Phase).To(Equal(popv1alpha1.BootSequencePhaseComplete))
 		latchedUID := got.Status.LastClusterRestartUID
 
-		_, err = reconcileBS("rerun", "default")
+		_, err = reconcileBS("rerun")
 		Expect(err).NotTo(HaveOccurred())
-		got = getBS("rerun", "default")
+		got = getBS("rerun")
 		Expect(got.Status.Phase).To(Equal(popv1alpha1.BootSequencePhaseComplete))
 		Expect(got.Status.LastClusterRestartUID).To(Equal(latchedUID))
 
@@ -307,9 +309,9 @@ var _ = Describe("BootSequence Controller", func() {
 		defer func() { _ = k8sClient.Delete(ctx, restart) }()
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "boot-2", Namespace: "default"}, restart)).To(Succeed())
 
-		_, err = reconcileBS("rerun", "default")
+		_, err = reconcileBS("rerun")
 		Expect(err).NotTo(HaveOccurred())
-		got = getBS("rerun", "default")
+		got = getBS("rerun")
 		Expect(got.Status.LastClusterRestartUID).To(Equal(string(restart.UID)))
 		Expect(got.Status.LastClusterRestartUID).NotTo(Equal(latchedUID))
 		Expect(got.Status.Phase).To(Or(
@@ -341,10 +343,10 @@ var _ = Describe("BootSequence Controller", func() {
 		Expect(k8sClient.Create(ctx, bs)).To(Succeed())
 		defer func() { _ = k8sClient.Delete(ctx, bs) }()
 
-		_, err := reconcileBS("force-timeout", "default")
+		_, err := reconcileBS("force-timeout")
 		Expect(err).NotTo(HaveOccurred())
 
-		got := getBS("force-timeout", "default")
+		got := getBS("force-timeout")
 		past := metav1.NewTime(time.Now().Add(-31 * time.Second))
 		got.Status.StartTime = &past
 		if st := stageByName(got.Status.Stages, "storage"); st.EligibleSince != nil {
@@ -356,9 +358,9 @@ var _ = Describe("BootSequence Controller", func() {
 		}
 		Expect(k8sClient.Status().Update(ctx, got)).To(Succeed())
 
-		_, err = reconcileBS("force-timeout", "default")
+		_, err = reconcileBS("force-timeout")
 		Expect(err).NotTo(HaveOccurred())
-		got = getBS("force-timeout", "default")
+		got = getBS("force-timeout")
 		Expect(got.Status.Phase).To(Equal(popv1alpha1.BootSequencePhaseInProgress))
 		Expect(stageByName(got.Status.Stages, "storage").Forced).To(BeTrue())
 		Expect(stageByName(got.Status.Stages, "apps").Ready).To(BeFalse())
