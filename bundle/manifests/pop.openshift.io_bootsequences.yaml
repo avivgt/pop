@@ -1,9 +1,9 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.1
-  creationTimestamp: null
   name: bootsequences.pop.openshift.io
 spec:
   group: pop.openshift.io
@@ -25,10 +25,11 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          BootSequence declares an ordered, health-gated intra-cluster workload
-          black-start: the spoke operator releases each stage only once its dependencies
-          satisfy their health gate (e.g. storage Ready before apps). It is the
-          workload-layer complement to the hub's cross-cluster FleetBootSequence.
+          BootSequence is standing GitOps config that observes an ordered, health-gated
+          intra-cluster workload black-start (e.g. storage Ready before apps). It does
+          not scale or hold workloads; it reports whether selected namespaces become
+          Ready in DAG order. A new ClusterRestart re-runs a completed sequence.
+          It is the workload-layer complement to the hub's FleetBootSequence.
         properties:
           apiVersion:
             description: |-
@@ -69,8 +70,9 @@ spec:
                       default: AllPodsReady
                       description: |-
                         HealthGate is the readiness condition that must hold before dependent
-                        stages are released. AllPodsReady: every non-completed pod in the selected
-                        namespaces is Ready (namespaces with no pods are trivially satisfied).
+                        stages are considered Ready. AllPodsReady: every selected namespace
+                        exists and has at least one non-completed pod, and every such pod is
+                        Ready. Empty or missing namespaces do not pass.
                       enum:
                       - AllPodsReady
                       type: string
@@ -177,6 +179,11 @@ spec:
                   - type
                   type: object
                 type: array
+              lastClusterRestartUID:
+                description: |-
+                  LastClusterRestartUID is the ClusterRestart that started this run.
+                  A newer ClusterRestart UID re-runs a standing (GitOps) BootSequence.
+                type: string
               message:
                 type: string
               observedGeneration:
@@ -194,6 +201,12 @@ spec:
                 items:
                   description: BootStageStatus is the observed readiness of a stage.
                   properties:
+                    eligibleSince:
+                      description: |-
+                        EligibleSince is when this stage's dependencies first became Ready.
+                        TimeoutSeconds is measured from this instant, not from sequence start.
+                      format: date-time
+                      type: string
                     forced:
                       type: boolean
                     message:
@@ -224,9 +237,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: null
-  storedVersions: null

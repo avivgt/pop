@@ -20,7 +20,7 @@ metadata:
     capabilities: Basic Install
     categories: OpenShift Optional
     description: Hub-side fleet controller for POP - orchestrates FleetShutdown and FleetBootSequence across ACM-managed clusters.
-  name: pop-hub-operator.v0.2.1
+  name: pop-hub-operator.v0.2.2
   namespace: placeholder
 spec:
   displayName: POP Hub Operator
@@ -39,8 +39,8 @@ spec:
   provider:
     name: POP Project
   maturity: alpha
-  version: 0.2.1
-  replaces: pop-hub-operator.v0.2.0
+  version: 0.2.2
+  replaces: pop-hub-operator.v0.2.1
   minKubeVersion: 1.28.0
   keywords:
     - acm
@@ -125,7 +125,7 @@ spec:
                     type: RuntimeDefault
                 containers:
                   - name: hub
-                    image: quay.io/aguetta/pop-hub:v0.2.1
+                    image: quay.io/aguetta/pop-hub:v0.2.2
                     args:
                       - --leader-elect
                       - --health-probe-bind-address=:8081

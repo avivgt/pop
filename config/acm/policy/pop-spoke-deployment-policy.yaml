@@ -44,7 +44,7 @@ spec:
                   namespace: pop-system
                 spec:
                   sourceType: grpc
-                  image: quay.io/aguetta/pop-catalog:v0.2.1
+                  image: quay.io/aguetta/pop-catalog:v0.2.2
                   displayName: POP Operators
                   publisher: POP Project
                   updateStrategy:
